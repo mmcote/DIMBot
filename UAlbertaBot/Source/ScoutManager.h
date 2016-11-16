@@ -15,11 +15,15 @@ class ScoutManager
 	bool			                _scoutUnderAttack;
     bool                            _didGasSteal;
     bool                            _gasStealFinished;
+	bool							_cannonRushReady;
+	bool							_initialCannonRushPylonDone;
+	bool							_nextProbeIsScout;
+	bool							_initialCannonRushCannonDone;
     int                             _currentRegionVertexIndex;
     int                             _previousScoutHP;
 	std::vector<BWAPI::Position>    _enemyRegionVertices;
 
-	bool                            enemyWorkerInRadius();
+	bool                            enemyWorkerInRadius(int radius=300);
     bool			                immediateThreat();
     void                            gasSteal();
     int                             getClosestVertexIndex(BWAPI::Unit unit);
@@ -39,6 +43,7 @@ public:
 
 	void update();
 
+	BWAPI::Unit getWorkerScout();
     void setWorkerScout(BWAPI::Unit unit);
 
 	void onSendText(std::string text);
@@ -48,5 +53,9 @@ public:
 	void onUnitRenegade(BWAPI::Unit unit);
 	void onUnitDestroy(BWAPI::Unit unit);
 	void onUnitMorph(BWAPI::Unit unit);
+
+	bool isCannonRushReady();
+	bool isNextProbeScout();
+	void setNextProbeScout(bool isScout);
 };
 }

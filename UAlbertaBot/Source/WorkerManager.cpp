@@ -1,5 +1,6 @@
 #include "Common.h"
 #include "WorkerManager.h"
+#include "ScoutManager.h"
 #include "Micro.h"
 
 using namespace UAlbertaBot;
@@ -133,8 +134,17 @@ void WorkerManager::handleIdleWorkers()
 		// if it is idle
 		if (workerData.getWorkerJob(worker) == WorkerData::Idle) 
 		{
-			// send it to the nearest mineral patch
-			setMineralWorker(worker);
+			if (ScoutManager::Instance().isNextProbeScout())
+			{
+				ScoutManager::Instance().setWorkerScout(worker);
+				ScoutManager::Instance().setNextProbeScout(false);
+			}
+			else
+			{
+				// send it to the nearest mineral patch
+				setMineralWorker(worker);
+			}
+			
 		}
 	}
 }
@@ -343,6 +353,10 @@ void WorkerManager::finishedWithWorker(BWAPI::Unit unit)
 	if (workerData.getWorkerJob(unit) != WorkerData::Scout)
 	{
 		workerData.setWorkerJob(unit, WorkerData::Idle, nullptr);
+	} 
+	else 
+	{
+		//workerData.setWorkerJob(unit, WorkerData::Idle, nullptr);
 	}
 }
 
@@ -394,6 +408,25 @@ BWAPI::Unit WorkerManager::getBuilder(Building & b, bool setJobAsBuilder)
 	{
         UAB_ASSERT(unit != nullptr, "Unit was null");
 
+		// cannon rush building uses scout worker
+		if (ScoutManager::Instance().isCannonRushReady())
+		{
+			//if (workerData.getWorkerJob(unit) == WorkerData::Scout) 
+			if (unit == ScoutManager::Instance().getWorkerScout())
+			{
+				if (setJobAsBuilder)
+				{
+					workerData.setWorkerJob(unit, WorkerData::Build, b.type);
+				}
+				
+				return unit;
+			}
+			else 
+			{
+				continue;
+			}
+		}
+
         // gas steal building uses scout worker
         if (b.isGasSteal && (workerData.getWorkerJob(unit) == WorkerData::Scout))
         {
@@ -429,6 +462,11 @@ BWAPI::Unit WorkerManager::getBuilder(Building & b, bool setJobAsBuilder)
 		}
 	}
 
+	if (ScoutManager::Instance().isCannonRushReady())
+	{
+		return nullptr;
+	}
+
 	// if we found a moving worker, use it, otherwise using a mining worker
 	BWAPI::Unit chosenWorker = closestMovingWorker ? closestMovingWorker : closestMiningWorker;
 
@@ -460,7 +498,7 @@ BWAPI::Unit WorkerManager::getMoveWorker(BWAPI::Position p)
 	// for each worker we currently have
 	for (auto & unit : workerData.getWorkers())
 	{
-        UAB_ASSERT(unit != nullptr, "Unit was null");
+		UAB_ASSERT(unit != nullptr, "Unit was null");
 
 		// only consider it if it's a mineral worker
 		if (unit->isCompleted() && workerData.getWorkerJob(unit) == WorkerData::Minerals)
@@ -486,27 +524,35 @@ void WorkerManager::setMoveWorker(int mineralsNeeded, int gasNeeded, BWAPI::Posi
 	BWAPI::Unit closestWorker = nullptr;
 	double closestDistance = 0;
 
-	// for each worker we currently have
-	for (auto & unit : workerData.getWorkers())
+	BWAPI::Unit scout = ScoutManager::Instance().getWorkerScout();
+	if (Config::Strategy::StrategyName == "Protoss_CannonRush" && ScoutManager::Instance().isCannonRushReady() && scout != nullptr)
 	{
-        UAB_ASSERT(unit != nullptr, "Unit was null");
-
-		// only consider it if it's a mineral worker
-		if (unit->isCompleted() && workerData.getWorkerJob(unit) == WorkerData::Minerals)
+		closestWorker = scout;
+	}
+	else
+	{
+		// for each worker we currently have
+		for (auto & unit : workerData.getWorkers())
 		{
-			// if it is a new closest distance, set the pointer
-			double distance = unit->getDistance(p);
-			if (!closestWorker || distance < closestDistance)
+			UAB_ASSERT(unit != nullptr, "Unit was null");
+
+			// only consider it if it's a mineral worker
+			if (unit->isCompleted() && workerData.getWorkerJob(unit) == WorkerData::Minerals)
 			{
-				closestWorker = unit;
-				closestDistance = distance;
+				// if it is a new closest distance, set the pointer
+				double distance = unit->getDistance(p);
+				if (!closestWorker || distance < closestDistance)
+				{
+					closestWorker = unit;
+					closestDistance = distance;
+				}
 			}
 		}
 	}
 
 	if (closestWorker)
 	{
-		//BWAPI::Broodwar->printf("Setting worker job Move for worker %d", closestWorker->getID());
+		BWAPI::Broodwar->printf("Setting worker job Move for worker %d", closestWorker->getID());
 		workerData.setWorkerJob(closestWorker, WorkerData::Move, WorkerMoveData(mineralsNeeded, gasNeeded, p));
 	}
 	else

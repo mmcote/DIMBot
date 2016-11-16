@@ -162,6 +162,9 @@ const MetaPairVector StrategyManager::getProtossBuildOrderGoal() const
             goal.push_back(MetaPair(BWAPI::UnitTypes::Protoss_Dragoon, numDragoons + 4));
         }
     }
+	else if (Config::Strategy::StrategyName == "Protoss_CannonRush") {
+
+	}
     else
     {
         UAB_ASSERT_WARNING(false, "Unknown Protoss Strategy Name: %s", Config::Strategy::StrategyName.c_str());
