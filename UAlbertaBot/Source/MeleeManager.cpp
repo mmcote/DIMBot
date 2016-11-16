@@ -39,7 +39,8 @@ void MeleeManager::assignTargetsOld(const BWAPI::Unitset & targets)
 		if (order.getType() == SquadOrderTypes::Attack || order.getType() == SquadOrderTypes::Defend) 
         {
             // run away if we meet the retreat critereon
-            if (meleeUnitShouldRetreat(meleeUnit, targets))
+			// never run if DropAttack squad
+			if (order.getType() != SquadOrderTypes::DropAttack && meleeUnitShouldRetreat(meleeUnit, targets))
             {
                 BWAPI::Position fleeTo(BWAPI::Broodwar->self()->getStartLocation());
 
