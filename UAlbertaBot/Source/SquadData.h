@@ -7,7 +7,7 @@ namespace UAlbertaBot
 class SquadData
 {
 	std::map<std::string, Squad> _squads;
-
+	std::map<std::string, Squad> _miniAttackSquads;
     void    updateAllSquads();
     void    verifySquadUniqueMembership();
 

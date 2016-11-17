@@ -74,6 +74,147 @@ void SquadData::updateAllSquads()
 {
 	for (auto & kv : _squads)
 	{
+		if (kv.second.getName().c_str() == "NeutralZoneAttack") {
+			continue;
+		}
+		// Prevent the MainAttack Squad from being baited to follow an individual combat unit 
+		// dragging the our attack squad around preventing our units from applying continuous 
+		// pressure to the enemy
+		if (!std::strcmp(kv.second.getName().c_str(), "MainAttack") && kv.second.getUnits().size() != 0) {
+			// Size of enemy base radius
+			int eRadius = 1000;
+			// First grab the information of both enemy and our own units
+			// Grab our own units information 
+			BWAPI::Unitset ourUnits = kv.second.getUnits();
+			std::vector<std::pair<BWAPI::Unit, bool> > squadUnits;
+			for (auto & u : ourUnits) { squadUnits.push_back(std::make_pair(u, false)); }
+
+			// to retrieve information on enemy units
+			InformationManager infoManager = InformationManager::Instance();
+
+			BWTA::BaseLocation * enemyBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->enemy());
+			auto enemyBasePosition = enemyBaseLocation->getPosition();
+			
+
+			// Check if any of the units are in the enemy attack zone, don't need to worry, everyone should
+			// just attack the base since there baiting technique is not working
+			bool alreadyInEnemyBase = false;
+			for (auto & u : ourUnits) {
+				if (enemyBasePosition.getDistance(u->getPosition()) < eRadius) {
+					alreadyInEnemyBase = true;
+				}
+			}
+
+			// Enemy's unit info, InformationManager only cares about combat units
+			const auto & enemyUnitInfo = infoManager.getUnitInfo(BWAPI::Broodwar->enemy());
+
+			// Create vector of enemy units 
+			// -That are a valid combat unit
+			// -Are currently visible to our units
+			// -Not in the final attack area (Targeting the bait situation in the "neutral" zone)
+			std::vector<BWAPI::Unit> validEnemyUnits;
+			for (auto & enemyUnit : enemyUnitInfo) {
+				if (infoManager.isCombatUnit(enemyUnit.second.type) &&
+					enemyUnit.second.unit->isVisible(BWAPI::Broodwar->self()) &&
+					enemyBasePosition.getDistance(enemyUnit.second.lastPosition) > eRadius) {
+					validEnemyUnits.push_back(enemyUnit.second.unit);
+				}
+			}
+
+			// There will only be a baiting maneuver if there is much less enemy units in the 
+			// neutral zone than in our main attack squad, make sure there are enemy units near
+			if (!alreadyInEnemyBase && squadUnits.size() > validEnemyUnits.size() && validEnemyUnits.size() != 0) {
+				// Form a seperate squad in order to handle enemies in the neutral zone, then those who
+				// are left should continue to pressure the enemy
+				// Take the frontmost unit
+				BWAPI::Unit unitClosest = kv.second.unitClosestToEnemy();
+				UAB_ASSERT(unitClosest, "No unit close to enemy.");
+
+				// Start checking for the amount of enemy units in radius around the closest unit to 
+				// determine if this is a possible baiting tactic, (if the enemy is to bait us into following
+				// them around the map then they will only send a very small amount of enemies).			
+				BWAPI::Unitset unitsNear = unitClosest->getUnitsInRadius(150);
+				
+				int enemyCount = 0;
+				int ourCount = 0;
+				std::vector<BWAPI::Unit> enemyUnitsNear;
+				std::vector<BWAPI::Unit> possibleNeutralZoneAttackSquad;
+				for (auto & unit : unitsNear) {
+					// filter out enemy units near by
+					if (std::find(validEnemyUnits.begin(), validEnemyUnits.end(), unit) != validEnemyUnits.end()) {
+						enemyUnitsNear.push_back(unit);
+						enemyCount++;
+					}
+					else if (std::find(squadUnits.begin(), squadUnits.end(), std::make_pair(unit, false)) != squadUnits.end()) {
+						possibleNeutralZoneAttackSquad.push_back(unit);
+						ourCount++;
+					}
+				}
+			
+				std::stringstream ss;
+				ss << enemyCount;
+				std::string enemyCountString = ss.str();
+				ss << ourCount;
+				std::string friendlyCountString = ss.str();
+				char result[100];   // array to hold the result.
+
+				strcpy(result, "Enemy Count: ");
+				strcat(result, enemyCountString.c_str());
+				strcat(result, " Friendly Count: ");
+				strcat(result, friendlyCountString.c_str());
+				/*UAB_ASSERT(false, result);*/
+
+				// if there is only a lone enemy assign two of our units to attack it, as it may
+				// just be a bait
+				Squad & neutralAttackSquad = getSquad("NeutralZoneAttack");
+				if (enemyCount == 1 && ourCount >= 1 && neutralAttackSquad.getUnits().size() <=2) {
+					neutralAttackSquad.addUnit(possibleNeutralZoneAttackSquad[0]);
+					kv.second.removeUnit(possibleNeutralZoneAttackSquad[0]);
+					if (ourCount > 1) {
+						neutralAttackSquad.addUnit(possibleNeutralZoneAttackSquad[1]);
+						kv.second.removeUnit(possibleNeutralZoneAttackSquad[1]);
+					}
+					for (auto & neutralZoneUnit : neutralAttackSquad.getUnits()) {
+						neutralZoneUnit->attack(enemyUnitsNear[0]);
+					}
+					for (auto & remainingUnit : kv.second.getUnits()) {
+						Micro::SmartAttackMove(remainingUnit, enemyBasePosition);
+					}
+					continue;
+				}
+			}
+
+			
+
+			//if (validEnemyUnits.size() > 0) {
+			//	// To test lets just assign units to a target nearby
+			//	double closest;
+			//	double tempClosest;
+			//	std::pair<BWAPI::Unit, bool> *closestUnit;
+
+			//	for (auto & enemyUnit : enemyUnitInfo) {
+			//		closest = 10000000;
+			//		if (std::find(validEnemyUnits.begin(), validEnemyUnits.end(), enemyUnit.second.unit) != validEnemyUnits.end()) {
+			//			for (auto & squadUnit : squadUnits) {
+			//				tempClosest = squadUnit.first->getPosition().getDistance(enemyUnit.second.lastPosition);
+			//				if (tempClosest < closest && squadUnit.second == false) {
+			//					closestUnit = &squadUnit;
+			//					closest = tempClosest;
+			//				}
+			//			}
+			//			Micro::SmartAttackUnit(closestUnit->first, enemyUnit.second.unit);
+			//			closestUnit->second = true;
+			//			//validEnemyUnits.erase(std::remove(validEnemyUnits.begin(), validEnemyUnits.end(), enemyUnit.second.unit), validEnemyUnits.end());
+			//		}
+			//	}
+
+			//	// for the rest of the units still remaining, set to attack main target
+			//	for (auto & ourUnit : ourUnits) {
+			//		Micro::SmartAttackMove(ourUnit, enemyBasePosition);
+			//	}
+			//	return;
+			//}
+		}
 		kv.second.update();
 	}
 }

@@ -24,6 +24,11 @@ void CombatCommander::initializeSquads()
     SquadOrder mainAttackOrder(SquadOrderTypes::Attack, getMainAttackLocation(), 800, "Attack Enemy Base");
 	_squadData.addSquad("MainAttack", Squad("MainAttack", mainAttackOrder, AttackPriority));
 
+	// the neutral zone attack squad will handle enemy units that try to bait our combat
+	// units to follow them around the map
+	SquadOrder neutralZoneAttackOrder(SquadOrderTypes::Attack, getMainAttackLocation(), 800, "Attack Enemy in Neutral Zone");
+	_squadData.addSquad("NeutralZoneAttack", Squad("NeutralZoneAttack", neutralZoneAttackOrder, AttackPriority));
+
     BWAPI::Position ourBasePosition = BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation());
 
     // the scout defense squad will handle chasing the enemy worker scout
@@ -67,6 +72,7 @@ void CombatCommander::update(const BWAPI::Unitset & combatUnits)
         updateScoutDefenseSquad();
 		updateDefenseSquads();
 		updateAttackSquads();
+		updateNeutralZoneAttackSquads();
 	}
 
 	_squadData.update();
@@ -83,6 +89,14 @@ void CombatCommander::updateIdleSquad()
             idleSquad.addUnit(unit);
         }
     }
+}
+
+void CombatCommander::updateNeutralZoneAttackSquads()
+{
+	Squad & neutralZoneAttackSquad = _squadData.getSquad("NeutralZoneAttack");
+	// TODO: Implement putting back units to the MainAttackSquad
+	SquadOrder neutralZoneAttackSquadOrder(SquadOrderTypes::Attack, getMainAttackLocation(), 800, "Attack Enemy Base");
+	neutralZoneAttackSquad.setSquadOrder(neutralZoneAttackSquadOrder);
 }
 
 void CombatCommander::updateAttackSquads()

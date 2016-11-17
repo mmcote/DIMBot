@@ -13,6 +13,7 @@ namespace UnitUtil
     bool CanAttackGround(BWAPI::Unit unit);
     bool IsGroundTarget(BWAPI::Unit unit);
     bool IsAirTarget(BWAPI::Unit unit);
+	bool IsBait(BWAPI::Unit unit);
     bool CanAttack(BWAPI::Unit attacker, BWAPI::Unit target);
     bool CanAttack(BWAPI::UnitType attacker, BWAPI::UnitType target);
     double CalculateLTD(BWAPI::Unit attacker, BWAPI::Unit target);
