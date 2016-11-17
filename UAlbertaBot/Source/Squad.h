@@ -63,7 +63,6 @@ public:
     size_t              getPriority() const;
     void                setPriority(const size_t & priority);
     const std::string & getName() const;
-	const BWAPI::Unit	getTransportShip() const;
     
 	BWAPI::Position     calcCenter();
 	BWAPI::Position     calcRegroupPosition();

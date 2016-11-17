@@ -34,9 +34,8 @@ public:
 	TransportManager();
 
 	void							executeMicro(const BWAPI::Unitset & targets);
-	void							update(const SquadOrder & inputOrder);
+	void							update();
 	void							setTransportShip(BWAPI::UnitInterface * unit);
-	const BWAPI::Unit				getTransportShip() const;
 	void							setFrom(BWAPI::Position from);
 	void							setTo(BWAPI::Position to);
 };
