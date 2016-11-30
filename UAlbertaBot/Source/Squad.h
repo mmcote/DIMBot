@@ -41,7 +41,6 @@ class Squad
 	void                        updateUnits();
 	void                        addUnitsToMicroManagers();
 	void                        setNearEnemyUnits();
-	void                        setAllUnits();
 	
 	bool                        unitNearEnemy(BWAPI::Unit unit);
 	bool                        needsToRegroup();
@@ -66,6 +65,7 @@ public:
 	BWAPI::Unit		unitClosestToEnemy();
 	BWAPI::Position     calcCenter();
 	BWAPI::Position     calcRegroupPosition();
+	void                        setAllUnits();
 
 	const BWAPI::Unitset &  getUnits() const;
 	const SquadOrder &  getSquadOrder()	const;

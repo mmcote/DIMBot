@@ -2,9 +2,10 @@
 
 using namespace UAlbertaBot;
 
+BWAPI::Unit SquadData::baitUnit = NULL;
+
 SquadData::SquadData() 
 {
-	baitUnitId = NULL;
 }
 
 void SquadData::update()
@@ -31,7 +32,7 @@ void SquadData::clearSquadData()
         }
 	}
 
-	baitUnitId = NULL;
+	SquadData::baitUnit = NULL;
 	_squads.clear();
 }
 
@@ -86,17 +87,22 @@ void SquadData::updateAllSquads()
 		if (!std::strcmp(kv.second.getName().c_str(), "MainAttack") && kv.second.getUnits().size() != 0) {
 			// Size of enemy base radius
 			int eRadius = 1000;
+
+			BWTA::BaseLocation * homeBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->self());
+			auto homeBasePosition = homeBaseLocation->getPosition();
+
 			// First grab the information of both enemy and our own units
 			// Grab our own units information 
 			BWAPI::Unitset ourUnits = kv.second.getUnits();
 			std::vector<std::pair<BWAPI::Unit, bool> > squadUnits;
 			for (auto & u : ourUnits) { 
-				squadUnits.push_back(std::make_pair(u, false)); 
+				if (homeBasePosition.getDistance(u->getPosition()) > eRadius) {
+					squadUnits.push_back(std::make_pair(u, false));
+				}
 			}
 
 			BWTA::BaseLocation * enemyBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->enemy());
 			auto enemyBasePosition = enemyBaseLocation->getPosition();
-
 
 			// Check if any of the units are in the enemy attack zone, don't need to worry, everyone should
 			// just attack the base since there baiting technique is not working
@@ -194,7 +200,7 @@ void SquadData::updateAllSquads()
 					for (auto & neutralZoneUnit : neutralAttackSquad.getUnits()) {
 						// since the check ensures that the bait is a lone unit
 						neutralZoneUnit->attack(enemyUnitsNear[0]);
-						baitUnit = enemyUnitsNear[0];
+						SquadData::baitUnit = enemyUnitsNear[0];
 					}
 
 
@@ -364,5 +370,5 @@ Squad & SquadData::getSquad(const std::string & squadName)
 }
 
 BWAPI::Unit SquadData::getBaitUnit() {
-	return baitUnit;
+	return SquadData::baitUnit;
 }
