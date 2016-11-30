@@ -4,7 +4,7 @@ using namespace UAlbertaBot;
 
 SquadData::SquadData() 
 {
-	
+	baitUnitId = NULL;
 }
 
 void SquadData::update()
@@ -31,6 +31,7 @@ void SquadData::clearSquadData()
         }
 	}
 
+	baitUnitId = NULL;
 	_squads.clear();
 }
 
@@ -74,9 +75,11 @@ void SquadData::updateAllSquads()
 {
 	for (auto & kv : _squads)
 	{
+		// Currently no update for the NeutralZoneAttack
 		if (kv.second.getName().c_str() == "NeutralZoneAttack") {
 			continue;
 		}
+
 		// Prevent the MainAttack Squad from being baited to follow an individual combat unit 
 		// dragging the our attack squad around preventing our units from applying continuous 
 		// pressure to the enemy
@@ -87,14 +90,13 @@ void SquadData::updateAllSquads()
 			// Grab our own units information 
 			BWAPI::Unitset ourUnits = kv.second.getUnits();
 			std::vector<std::pair<BWAPI::Unit, bool> > squadUnits;
-			for (auto & u : ourUnits) { squadUnits.push_back(std::make_pair(u, false)); }
-
-			// to retrieve information on enemy units
-			InformationManager infoManager = InformationManager::Instance();
+			for (auto & u : ourUnits) { 
+				squadUnits.push_back(std::make_pair(u, false)); 
+			}
 
 			BWTA::BaseLocation * enemyBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->enemy());
 			auto enemyBasePosition = enemyBaseLocation->getPosition();
-			
+
 
 			// Check if any of the units are in the enemy attack zone, don't need to worry, everyone should
 			// just attack the base since there baiting technique is not working
@@ -102,10 +104,14 @@ void SquadData::updateAllSquads()
 			for (auto & u : ourUnits) {
 				if (enemyBasePosition.getDistance(u->getPosition()) < eRadius) {
 					alreadyInEnemyBase = true;
+					break;
 				}
 			}
 
-			// Enemy's unit info, InformationManager only cares about combat units
+			// to retrieve information on enemy units
+			InformationManager infoManager = InformationManager::Instance();
+
+			// Enemy's unit info from InformationManager
 			const auto & enemyUnitInfo = infoManager.getUnitInfo(BWAPI::Broodwar->enemy());
 
 			// Create vector of enemy units 
@@ -121,18 +127,18 @@ void SquadData::updateAllSquads()
 				}
 			}
 
-			// There will only be a baiting maneuver if there is much less enemy units in the 
+			// There will only be a baiting maneuver if there is less enemy units in the 
 			// neutral zone than in our main attack squad, make sure there are enemy units near
-			if (!alreadyInEnemyBase && squadUnits.size() > validEnemyUnits.size() && validEnemyUnits.size() != 0) {
-				// Form a seperate squad in order to handle enemies in the neutral zone, then those who
-				// are left should continue to pressure the enemy
+			if (!alreadyInEnemyBase && validEnemyUnits.size() != 0 && squadUnits.size() > validEnemyUnits.size()) {
+				// Form a seperate squad in order to handle enemies in the neutral zone 
+				// TODO: then those who are left should continue to pressure the enemy
 				// Take the frontmost unit
 				BWAPI::Unit unitClosest = kv.second.unitClosestToEnemy();
 				UAB_ASSERT(unitClosest, "No unit close to enemy.");
 
 				// Start checking for the amount of enemy units in radius around the closest unit to 
 				// determine if this is a possible baiting tactic, (if the enemy is to bait us into following
-				// them around the map then they will only send a very small amount of enemies).			
+				// them around the map then they will only send a very small amount of enemy units).			
 				BWAPI::Unitset unitsNear = unitClosest->getUnitsInRadius(150);
 				
 				int enemyCount = 0;
@@ -162,21 +168,41 @@ void SquadData::updateAllSquads()
 				strcat(result, enemyCountString.c_str());
 				strcat(result, " Friendly Count: ");
 				strcat(result, friendlyCountString.c_str());
-				/*UAB_ASSERT(false, result);*/
+				UAB_ASSERT(false, result);
 
 				// if there is only a lone enemy assign two of our units to attack it, as it may
 				// just be a bait
 				Squad & neutralAttackSquad = getSquad("NeutralZoneAttack");
 				if (enemyCount == 1 && ourCount >= 1 && neutralAttackSquad.getUnits().size() <=2) {
-					neutralAttackSquad.addUnit(possibleNeutralZoneAttackSquad[0]);
-					kv.second.removeUnit(possibleNeutralZoneAttackSquad[0]);
-					if (ourCount > 1) {
+					for (int unitIndex = 0; unitIndex < possibleNeutralZoneAttackSquad.size(); ++unitIndex) {
+						for (auto & currentNeutralZoneUnit : neutralAttackSquad.getUnits()) {
+							if (neutralAttackSquad.getUnits().size() > 2) {
+								break;
+							}
+							if (possibleNeutralZoneAttackSquad[unitIndex] != currentNeutralZoneUnit) {
+								neutralAttackSquad.addUnit(possibleNeutralZoneAttackSquad[unitIndex]);
+								kv.second.removeUnit(possibleNeutralZoneAttackSquad[unitIndex]);
+							}
+						}
+					}
+				
+					
+					/*if (ourCount > 1) {
 						neutralAttackSquad.addUnit(possibleNeutralZoneAttackSquad[1]);
 						kv.second.removeUnit(possibleNeutralZoneAttackSquad[1]);
-					}
+					}*/
 					for (auto & neutralZoneUnit : neutralAttackSquad.getUnits()) {
+						// since the check ensures that the bait is a lone unit
 						neutralZoneUnit->attack(enemyUnitsNear[0]);
+						baitUnit = enemyUnitsNear[0];
 					}
+
+
+
+					// need better function to tell the rest to continue on
+					// instead of telling them to attack the base, they should just be attacking
+					// other units and not targeting the one our NeutralZoneAttackSquad is
+					// attacking
 					for (auto & remainingUnit : kv.second.getUnits()) {
 						Micro::SmartAttackMove(remainingUnit, enemyBasePosition);
 					}
@@ -335,4 +361,8 @@ Squad & SquadData::getSquad(const std::string & squadName)
     }
 
     return _squads[squadName];
+}
+
+BWAPI::Unit SquadData::getBaitUnit() {
+	return baitUnit;
 }

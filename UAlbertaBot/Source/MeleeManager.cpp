@@ -1,5 +1,6 @@
 #include "MeleeManager.h"
 #include "UnitUtil.h"
+#include "SquadData.h"
 
 using namespace UAlbertaBot;
 
@@ -16,7 +17,7 @@ void MeleeManager::executeMicro(const BWAPI::Unitset & targets)
 void MeleeManager::assignTargetsOld(const BWAPI::Unitset & targets)
 {
     const BWAPI::Unitset & meleeUnits = getUnits();
-
+	SquadData squadData = SquadData();
 	// figure out targets
 	BWAPI::Unitset meleeUnitTargets;
 	for (auto & target : targets) 
@@ -26,7 +27,8 @@ void MeleeManager::assignTargetsOld(const BWAPI::Unitset & targets)
 			!(target->isLifted()) &&
 			!(target->getType() == BWAPI::UnitTypes::Zerg_Larva) && 
 			!(target->getType() == BWAPI::UnitTypes::Zerg_Egg) &&
-			target->isVisible()) 
+			target->isVisible() && 
+			(squadData.getBaitUnit() != NULL && target != squadData.getBaitUnit())) 
 		{
 			meleeUnitTargets.insert(target);
 		}

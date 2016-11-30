@@ -6,6 +6,7 @@ namespace UAlbertaBot
 {
 class SquadData
 {
+	static BWAPI::Unit baitUnit;
 	std::map<std::string, Squad> _squads;
 	std::map<std::string, Squad> _miniAttackSquads;
     void    updateAllSquads();
@@ -16,7 +17,7 @@ public:
 	SquadData();
 
     void            clearSquadData();
-
+	
     bool            canAssignUnitToSquad(BWAPI::Unit unit, const Squad & squad) const;
     void            assignUnitToSquad(BWAPI::Unit unit, Squad & squad);
     void            addSquad(const std::string & squadName, const Squad & squad);
@@ -34,5 +35,7 @@ public:
 
     Squad &         getSquad(const std::string & squadName);
     const std::map<std::string, Squad> & getSquads() const;
+
+	BWAPI::Unit		getBaitUnit();
 };
 }
