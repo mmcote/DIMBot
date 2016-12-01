@@ -72,12 +72,38 @@ void SquadData::addSquad(const std::string & squadName, const Squad & squad)
 	_squads[squadName] = squad;
 }
 
+void SquadData::updateNeutralZoneAttackSquad() {
+	Squad *neutralZoneAttackSquad = &getSquad("NeutralZoneAttack");
+	// if there are no units then just return
+	if (neutralZoneAttackSquad->getUnits().size() <= 0) {
+		return;
+	}
+	// -- remove all dead units and reassign to the mainAttackSquad
+	neutralZoneAttackSquad->setAllUnits();
+	BWAPI::Unitset nZASUnits = neutralZoneAttackSquad->getUnits();
+	if (nZASUnits.size() <= 0) {
+		baitUnit = NULL;
+	}
+	// check if the target unit is still alive
+	if (baitUnit->getHitPoints() <= 0 || !baitUnit->exists()) {
+		// release neutralZoneAttackSquad units to the mainAttackSquad
+		// clean up the _units vector just in case one of them died
+		baitUnit = NULL;
+		Squad *mainAttackSquad = &getSquad("MainAttack");
+		for (auto & unit : nZASUnits) {
+			mainAttackSquad->addUnit(unit);
+		}
+		neutralZoneAttackSquad->clear();
+	}
+}
+
 void SquadData::updateAllSquads()
 {
 	for (auto & kv : _squads)
 	{
 		// Currently no update for the NeutralZoneAttack
-		if (kv.second.getName().c_str() == "NeutralZoneAttack") {
+		if (!std::strcmp(kv.second.getName().c_str(), "NeutralZoneAttack")) {
+			updateNeutralZoneAttackSquad();
 			continue;
 		}
 
@@ -145,12 +171,13 @@ void SquadData::updateAllSquads()
 				// Start checking for the amount of enemy units in radius around the closest unit to 
 				// determine if this is a possible baiting tactic, (if the enemy is to bait us into following
 				// them around the map then they will only send a very small amount of enemy units).			
-				BWAPI::Unitset unitsNear = unitClosest->getUnitsInRadius(150);
+				BWAPI::Unitset unitsNear = unitClosest->getUnitsInRadius(300);
 				
 				int enemyCount = 0;
-				int ourCount = 0;
+				int ourCount = 1;
 				std::vector<BWAPI::Unit> enemyUnitsNear;
 				std::vector<BWAPI::Unit> possibleNeutralZoneAttackSquad;
+				possibleNeutralZoneAttackSquad.push_back(unitClosest);
 				for (auto & unit : unitsNear) {
 					// filter out enemy units near by
 					if (std::find(validEnemyUnits.begin(), validEnemyUnits.end(), unit) != validEnemyUnits.end()) {
@@ -162,7 +189,9 @@ void SquadData::updateAllSquads()
 						ourCount++;
 					}
 				}
-			
+				Squad & neutralAttackSquad = getSquad("NeutralZoneAttack");
+				int currentSize = neutralAttackSquad.getUnits().size();
+
 				std::stringstream ss;
 				ss << enemyCount;
 				std::string enemyCountString = ss.str();
@@ -178,41 +207,35 @@ void SquadData::updateAllSquads()
 
 				// if there is only a lone enemy assign two of our units to attack it, as it may
 				// just be a bait
-				Squad & neutralAttackSquad = getSquad("NeutralZoneAttack");
-				if (enemyCount == 1 && ourCount >= 1 && neutralAttackSquad.getUnits().size() <=2) {
+				if (enemyCount == 1 && ourCount >= 1 && neutralAttackSquad.getUnits().size() <= 2) {
+					// since the check ensures that the bait is a lone unit
+					if (baitUnit == NULL) {
+						baitUnit = enemyUnitsNear[0];
+					}
+
+					bool inValid = false;
+
 					for (int unitIndex = 0; unitIndex < possibleNeutralZoneAttackSquad.size(); ++unitIndex) {
 						for (auto & currentNeutralZoneUnit : neutralAttackSquad.getUnits()) {
-							if (neutralAttackSquad.getUnits().size() > 2) {
-								break;
-							}
+							// check that the possible neutral zone attack unit is not already in the N.Z.A.S.
 							if (possibleNeutralZoneAttackSquad[unitIndex] != currentNeutralZoneUnit) {
-								neutralAttackSquad.addUnit(possibleNeutralZoneAttackSquad[unitIndex]);
-								kv.second.removeUnit(possibleNeutralZoneAttackSquad[unitIndex]);
+								inValid = true;
 							}
 						}
+						// stop adding units to a squad if there is already two members, the max
+						if (neutralAttackSquad.getUnits().size() > 2) {
+							break;
+						}
+						// add the unit to the N.Z.A.S. and remove the unit from the main attack squad
+						if (!inValid) {
+							neutralAttackSquad.addUnit(possibleNeutralZoneAttackSquad[unitIndex]);
+							kv.second.removeUnit(possibleNeutralZoneAttackSquad[unitIndex]);
+						}
 					}
-				
-					
-					/*if (ourCount > 1) {
-						neutralAttackSquad.addUnit(possibleNeutralZoneAttackSquad[1]);
-						kv.second.removeUnit(possibleNeutralZoneAttackSquad[1]);
-					}*/
+
 					for (auto & neutralZoneUnit : neutralAttackSquad.getUnits()) {
-						// since the check ensures that the bait is a lone unit
-						neutralZoneUnit->attack(enemyUnitsNear[0]);
-						SquadData::baitUnit = enemyUnitsNear[0];
+						neutralZoneUnit->attack(baitUnit);
 					}
-
-
-
-					// need better function to tell the rest to continue on
-					// instead of telling them to attack the base, they should just be attacking
-					// other units and not targeting the one our NeutralZoneAttackSquad is
-					// attacking
-					for (auto & remainingUnit : kv.second.getUnits()) {
-						Micro::SmartAttackMove(remainingUnit, enemyBasePosition);
-					}
-					continue;
 				}
 			}
 
