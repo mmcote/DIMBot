@@ -72,7 +72,42 @@ void SquadData::addSquad(const std::string & squadName, const Squad & squad)
 	_squads[squadName] = squad;
 }
 
+/* splitUnits function is a filter that splits enemy units into allies and
+enemies within a specific are based off of prior filter results in a larger
+area. (For example in the case of the Neutral Zone Attack Squad, first we 
+found all of the corresponding units in the Neutral Zone then now it
+can be used to filter specific units within a certain radius around the 
+foremost unit unitClosest).
+*/
+std::pair<std::vector<BWAPI::Unit>, std::vector<BWAPI::Unit> > splitUnits( BWAPI::Unit unitClosest, 
+	int radius, std::vector<BWAPI::Unit> validEnemyUnits, std::vector<BWAPI::Unit> validOwnUnits) {
+	BWAPI::Unitset unitsNear = unitClosest->getUnitsInRadius(radius);
+	std::vector<BWAPI::Unit> enemyUnits;
+	std::vector<BWAPI::Unit> ownUnits;
+	ownUnits.push_back(unitClosest);
+	for (auto & unit : unitsNear) {
+		// filter out enemy units near by
+		if (std::find(validEnemyUnits.begin(), validEnemyUnits.end(), unit) != validEnemyUnits.end()) {
+			enemyUnits.push_back(unit);
+		}
+		else if (std::find(validOwnUnits.begin(), validOwnUnits.end(), unit) != validOwnUnits.end()) {
+			ownUnits.push_back(unit);
+		}
+	}
+
+	return std::make_pair(enemyUnits, ownUnits);
+}
+
+/* updateNeutralZoneAttackSquad is used to update the NeutralZoneAttackSquad
+with each frame. The reason this is separate from the squad update function
+is due to the fact that the squad update function is based on the type of 
+attack squad one is. Whereas the Neutral Zone Attack Squad is built from the 
+Main Attack Squad and will be reassigned once there job is accomplished.
+Therefore there update is much different.
+*/
 void SquadData::updateNeutralZoneAttackSquad() {
+// TODO: If there is already an Neutral Zone Attack Squad how should we add to
+// it if we have to?
 	Squad *neutralZoneAttackSquad = &getSquad("NeutralZoneAttack");
 	// if there are no units then just return
 	if (neutralZoneAttackSquad->getUnits().size() <= 0) {
@@ -85,7 +120,7 @@ void SquadData::updateNeutralZoneAttackSquad() {
 		baitUnit = NULL;
 	}
 	// check if the target unit is still alive
-	if (baitUnit->getHitPoints() <= 0 || !baitUnit->exists()) {
+	if (baitUnit != NULL && (baitUnit->getHitPoints() <= 0 || !baitUnit->exists())) {
 		// release neutralZoneAttackSquad units to the mainAttackSquad
 		// clean up the _units vector just in case one of them died
 		baitUnit = NULL;
@@ -101,37 +136,39 @@ void SquadData::updateAllSquads()
 {
 	for (auto & kv : _squads)
 	{
-		// Currently no update for the NeutralZoneAttack
+		/* Instead of calling the usual squad update we want to call the 
+		Neutral Zone Attack Squad to handle the current bait situation */
 		if (!std::strcmp(kv.second.getName().c_str(), "NeutralZoneAttack")) {
 			updateNeutralZoneAttackSquad();
 			continue;
 		}
 
-		// Prevent the MainAttack Squad from being baited to follow an individual combat unit 
-		// dragging the our attack squad around preventing our units from applying continuous 
-		// pressure to the enemy
+		/* Prevent the MainAttack Squad from being baited to follow an 
+		individual combat unit dragging the main attack squad around and 
+		preventing our units from applying continuous pressure to the enemy */
 		if (!std::strcmp(kv.second.getName().c_str(), "MainAttack") && kv.second.getUnits().size() != 0) {
-			// Size of enemy base radius
+			/* Size of enemy base radius, approximately */
 			int eRadius = 1000;
 
 			BWTA::BaseLocation * homeBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->self());
 			auto homeBasePosition = homeBaseLocation->getPosition();
 
-			// First grab the information of both enemy and our own units
-			// Grab our own units information 
+			/* -- Grab the information of both enemy and our own units -- */
+			/* Grab our own units information */
 			BWAPI::Unitset ourUnits = kv.second.getUnits();
-			std::vector<std::pair<BWAPI::Unit, bool> > squadUnits;
+			std::vector<BWAPI::Unit> squadUnits;
 			for (auto & u : ourUnits) { 
 				if (homeBasePosition.getDistance(u->getPosition()) > eRadius) {
-					squadUnits.push_back(std::make_pair(u, false));
+					squadUnits.push_back(u);
 				}
 			}
 
 			BWTA::BaseLocation * enemyBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->enemy());
 			auto enemyBasePosition = enemyBaseLocation->getPosition();
 
-			// Check if any of the units are in the enemy attack zone, don't need to worry, everyone should
-			// just attack the base since there baiting technique is not working
+			/* Check if any of our units are in the enemy attack zone, if so then
+			we do not have to worry about a bait tactic, just attack the base since 
+			there baiting technique is not working */
 			bool alreadyInEnemyBase = false;
 			for (auto & u : ourUnits) {
 				if (enemyBasePosition.getDistance(u->getPosition()) < eRadius) {
@@ -140,16 +177,16 @@ void SquadData::updateAllSquads()
 				}
 			}
 
-			// to retrieve information on enemy units
+			/* Grab enemy units information */
 			InformationManager infoManager = InformationManager::Instance();
 
 			// Enemy's unit info from InformationManager
 			const auto & enemyUnitInfo = infoManager.getUnitInfo(BWAPI::Broodwar->enemy());
 
 			// Create vector of enemy units 
-			// -That are a valid combat unit
-			// -Are currently visible to our units
-			// -Not in the final attack area (Targeting the bait situation in the "neutral" zone)
+			// - That are a valid combat unit
+			// - Are currently visible to our units
+			// - Not in the final attack area (Targeting the bait situation in the "neutral" zone)
 			std::vector<BWAPI::Unit> validEnemyUnits;
 			for (auto & enemyUnit : enemyUnitInfo) {
 				if (infoManager.isCombatUnit(enemyUnit.second.type) &&
@@ -159,38 +196,23 @@ void SquadData::updateAllSquads()
 				}
 			}
 
-			// There will only be a baiting maneuver if there is less enemy units in the 
-			// neutral zone than in our main attack squad, make sure there are enemy units near
+			/* There will only be a baiting maneuver if there is much less enemy units in the 
+			neutral zone than in our main attack squad, make sure an enemy unit is near */
 			if (!alreadyInEnemyBase && validEnemyUnits.size() != 0 && squadUnits.size() > validEnemyUnits.size()) {
-				// Form a seperate squad in order to handle enemies in the neutral zone 
-				// TODO: then those who are left should continue to pressure the enemy
-				// Take the frontmost unit
+				/* Take the frontmost unit */
 				BWAPI::Unit unitClosest = kv.second.unitClosestToEnemy();
 				UAB_ASSERT(unitClosest, "No unit close to enemy.");
 
-				// Start checking for the amount of enemy units in radius around the closest unit to 
-				// determine if this is a possible baiting tactic, (if the enemy is to bait us into following
-				// them around the map then they will only send a very small amount of enemy units).			
-				BWAPI::Unitset unitsNear = unitClosest->getUnitsInRadius(300);
-				
-				int enemyCount = 0;
-				int ourCount = 1;
-				std::vector<BWAPI::Unit> enemyUnitsNear;
-				std::vector<BWAPI::Unit> possibleNeutralZoneAttackSquad;
-				possibleNeutralZoneAttackSquad.push_back(unitClosest);
-				for (auto & unit : unitsNear) {
-					// filter out enemy units near by
-					if (std::find(validEnemyUnits.begin(), validEnemyUnits.end(), unit) != validEnemyUnits.end()) {
-						enemyUnitsNear.push_back(unit);
-						enemyCount++;
-					}
-					else if (std::find(squadUnits.begin(), squadUnits.end(), std::make_pair(unit, false)) != squadUnits.end()) {
-						possibleNeutralZoneAttackSquad.push_back(unit);
-						ourCount++;
-					}
-				}
-				Squad & neutralAttackSquad = getSquad("NeutralZoneAttack");
-				int currentSize = neutralAttackSquad.getUnits().size();
+				/* Start checking for the amount of enemy units in radius around the 
+				closest unit to determine if this is a possible baiting tactic */
+				int baitRadius = 300;
+				std::pair<std::vector<BWAPI::Unit>, std::vector<BWAPI::Unit> > enemyAllies = 
+					splitUnits(unitClosest, baitRadius, validEnemyUnits, squadUnits);
+				int enemyCount = enemyAllies.first.size();
+				int ourCount = enemyAllies.second.size();
+
+		// TODO: If there is already an Neutral Zone Attack Squad how should we add to
+		// it if we have to?
 
 				std::stringstream ss;
 				ss << enemyCount;
@@ -205,20 +227,66 @@ void SquadData::updateAllSquads()
 				strcat(result, friendlyCountString.c_str());
 				UAB_ASSERT(false, result);
 
-				// if there is only a lone enemy assign two of our units to attack it, as it may
-				// just be a bait
-				if (enemyCount == 1 && ourCount >= 1 && neutralAttackSquad.getUnits().size() <= 2) {
+				/* Use the branching Neutral Zone Attack Squad to handle enemies in the neutral zone */
+				Squad & neutralAttackSquad = getSquad("NeutralZoneAttack");
+				
+				if (enemyCount == 1 && ourCount >= 1 && neutralAttackSquad.getUnits().size() == 0) {
+					/*
+						The code between the lines of ~236 - 266, was originally how I intended to
+						implement the decision of how many units will be assigned to the Neutral Zone
+						Attack Squad.
+						
+						Plan: Was going to continually grab units within a certain radius of the closest
+						unit and run the sparcraft simulation. Using the smallest radius to decide how 
+						many units were needed to defeat the lone bait unit. Hence smaller radius, less 
+						units needed to get rid of the bait unit.
+					*/
+					// first find out how many units are needed to defeat the bait unit with a sparcraft simulation
+					/* 
+					bool win = false;
+					int radius = 100;
+					SparCraft::ScoreType score = 0;
+					CombatSimulation sim;
+					while (radius <= baitRadius) {
+						sim.setCombatUnits(unitClosest->getPosition(), radius);
+						score = sim.simulateCombat();
+						if (score > 0) {
+							win = true;
+							break;
+						} else {
+							radius += 50;
+						}
+					}
+					if (win) {
+						// produce the minimum set of units needed to meet the sparcraft win
+						std::pair<std::vector<BWAPI::Unit>, std::vector<BWAPI::Unit> > baitUnits =
+							splitUnits(unitClosest, radius, enemyAllies.first, enemyAllies.second);
+
+						// since the check ensures that the bait is a lone unit
+						if (baitUnit == NULL) {
+							baitUnit = baitUnits.first[0];
+						}
+
+						for (auto & unit : baitUnits.second) {
+							neutralAttackSquad.addUnit(unit);
+							kv.second.removeUnit(unit);
+
+							unit->attack(baitUnit);
+						}
+					}
+					*/
+
 					// since the check ensures that the bait is a lone unit
 					if (baitUnit == NULL) {
-						baitUnit = enemyUnitsNear[0];
+						baitUnit = enemyAllies.first[0];
 					}
 
+					// the following code will now be used to replace a unit if someone dies
 					bool inValid = false;
-
-					for (int unitIndex = 0; unitIndex < possibleNeutralZoneAttackSquad.size(); ++unitIndex) {
+					for (auto & unit : enemyAllies.second) {
 						for (auto & currentNeutralZoneUnit : neutralAttackSquad.getUnits()) {
 							// check that the possible neutral zone attack unit is not already in the N.Z.A.S.
-							if (possibleNeutralZoneAttackSquad[unitIndex] != currentNeutralZoneUnit) {
+							if (unit != currentNeutralZoneUnit) {
 								inValid = true;
 							}
 						}
@@ -228,47 +296,14 @@ void SquadData::updateAllSquads()
 						}
 						// add the unit to the N.Z.A.S. and remove the unit from the main attack squad
 						if (!inValid) {
-							neutralAttackSquad.addUnit(possibleNeutralZoneAttackSquad[unitIndex]);
-							kv.second.removeUnit(possibleNeutralZoneAttackSquad[unitIndex]);
-						}
-					}
+							neutralAttackSquad.addUnit(unit);
+							kv.second.removeUnit(unit);
 
-					for (auto & neutralZoneUnit : neutralAttackSquad.getUnits()) {
-						neutralZoneUnit->attack(baitUnit);
+							unit->attack(baitUnit);
+						}
 					}
 				}
 			}
-
-			
-
-			//if (validEnemyUnits.size() > 0) {
-			//	// To test lets just assign units to a target nearby
-			//	double closest;
-			//	double tempClosest;
-			//	std::pair<BWAPI::Unit, bool> *closestUnit;
-
-			//	for (auto & enemyUnit : enemyUnitInfo) {
-			//		closest = 10000000;
-			//		if (std::find(validEnemyUnits.begin(), validEnemyUnits.end(), enemyUnit.second.unit) != validEnemyUnits.end()) {
-			//			for (auto & squadUnit : squadUnits) {
-			//				tempClosest = squadUnit.first->getPosition().getDistance(enemyUnit.second.lastPosition);
-			//				if (tempClosest < closest && squadUnit.second == false) {
-			//					closestUnit = &squadUnit;
-			//					closest = tempClosest;
-			//				}
-			//			}
-			//			Micro::SmartAttackUnit(closestUnit->first, enemyUnit.second.unit);
-			//			closestUnit->second = true;
-			//			//validEnemyUnits.erase(std::remove(validEnemyUnits.begin(), validEnemyUnits.end(), enemyUnit.second.unit), validEnemyUnits.end());
-			//		}
-			//	}
-
-			//	// for the rest of the units still remaining, set to attack main target
-			//	for (auto & ourUnit : ourUnits) {
-			//		Micro::SmartAttackMove(ourUnit, enemyBasePosition);
-			//	}
-			//	return;
-			//}
 		}
 		kv.second.update();
 	}
