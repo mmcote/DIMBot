@@ -50,7 +50,7 @@
         "DrawResourceInfo"          : false,
         "DrawCombatSimInfo"         : false,
         "DrawUnitTargetInfo"        : false,
-        "DrawBWTAInfo"              : false,
+        "DrawBWTAInfo"              : true,
         "DrawMapGrid"               : false,
         "DrawSquadInfo"             : true,
         "DrawWorkerInfo"            : false,
@@ -84,7 +84,8 @@
         
         "ScoutGasSteal"             : false,
         "ScoutHarassEnemy"          : true,
-        
+        "PreventBaiting"            : false,
+        "BaitEnemy"                 : true,
         "ReadDirectory"             : "bwapi-data/read/",
         "WriteDirectory"            : "bwapi-data/write/",
                 

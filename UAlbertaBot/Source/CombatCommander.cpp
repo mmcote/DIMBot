@@ -5,6 +5,7 @@ using namespace UAlbertaBot;
 
 const size_t IdlePriority = 0;
 const size_t AttackPriority = 1;
+const size_t BaitPriority = 1;
 const size_t BaseDefensePriority = 2;
 const size_t ScoutDefensePriority = 3;
 const size_t DropPriority = 4;
@@ -24,11 +25,6 @@ void CombatCommander::initializeSquads()
     SquadOrder mainAttackOrder(SquadOrderTypes::Attack, getMainAttackLocation(), 800, "Attack Enemy Base");
 	_squadData.addSquad("MainAttack", Squad("MainAttack", mainAttackOrder, AttackPriority));
 
-	// the neutral zone attack squad will handle enemy units that try to bait our combat
-	// units to follow them around the map
-	SquadOrder neutralZoneAttackOrder(SquadOrderTypes::Attack, getMainAttackLocation(), 800, "Attack Enemy in Neutral Zone");
-	_squadData.addSquad("NeutralZoneAttack", Squad("NeutralZoneAttack", neutralZoneAttackOrder, AttackPriority));
-
     BWAPI::Position ourBasePosition = BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation());
 
     // the scout defense squad will handle chasing the enemy worker scout
@@ -41,6 +37,19 @@ void CombatCommander::initializeSquads()
         SquadOrder zealotDrop(SquadOrderTypes::Drop, ourBasePosition, 900, "Wait for transport");
         _squadData.addSquad("Drop", Squad("Drop", zealotDrop, DropPriority));
     }
+
+	if (Config::Strategy::PreventBaiting) {
+		// the neutral zone attack squad will handle enemy units that try to bait our combat
+		// units to follow them around the map
+		SquadOrder neutralZoneAttackOrder(SquadOrderTypes::Attack, getMainAttackLocation(), 800, "Attack Enemy in Neutral Zone");
+		_squadData.addSquad("NeutralZoneAttack", Squad("NeutralZoneAttack", neutralZoneAttackOrder, AttackPriority));
+	}
+
+	if (Config::Strategy::BaitEnemy) {
+		// change the position of the bait squad, although this will do for now as we want to keep the enemy closer to their base
+		SquadOrder baitSquad(SquadOrderTypes::Bait, getMainAttackLocation(), 800, "Bait Enemy in Neutral Zone");
+		_squadData.addSquad("Bait", Squad("Bait", baitSquad, BaitPriority));
+	}
 
     _initialized = true;
 }
