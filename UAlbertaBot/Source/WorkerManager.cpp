@@ -353,10 +353,6 @@ void WorkerManager::finishedWithWorker(BWAPI::Unit unit)
 	if (workerData.getWorkerJob(unit) != WorkerData::Scout)
 	{
 		workerData.setWorkerJob(unit, WorkerData::Idle, nullptr);
-	} 
-	else 
-	{
-		//workerData.setWorkerJob(unit, WorkerData::Idle, nullptr);
 	}
 }
 
@@ -409,7 +405,7 @@ BWAPI::Unit WorkerManager::getBuilder(Building & b, bool setJobAsBuilder)
         UAB_ASSERT(unit != nullptr, "Unit was null");
 
 		// cannon rush building uses scout worker
-		if (ScoutManager::Instance().isCannonRushReady())
+		if (ScoutManager::Instance().isCannonRushReady() && !ScoutManager::Instance().isCannonRushDone())
 		{
 			//if (workerData.getWorkerJob(unit) == WorkerData::Scout) 
 			if (unit == ScoutManager::Instance().getWorkerScout())
@@ -462,7 +458,7 @@ BWAPI::Unit WorkerManager::getBuilder(Building & b, bool setJobAsBuilder)
 		}
 	}
 
-	if (ScoutManager::Instance().isCannonRushReady())
+	if (ScoutManager::Instance().isCannonRushReady() && !ScoutManager::Instance().isCannonRushDone())
 	{
 		return nullptr;
 	}
@@ -552,7 +548,7 @@ void WorkerManager::setMoveWorker(int mineralsNeeded, int gasNeeded, BWAPI::Posi
 
 	if (closestWorker)
 	{
-		BWAPI::Broodwar->printf("Setting worker job Move for worker %d", closestWorker->getID());
+		// BWAPI::Broodwar->printf("Setting worker job Move for worker %d", closestWorker->getID());
 		workerData.setWorkerJob(closestWorker, WorkerData::Move, WorkerMoveData(mineralsNeeded, gasNeeded, p));
 	}
 	else

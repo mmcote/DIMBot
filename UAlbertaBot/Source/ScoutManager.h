@@ -16,9 +16,9 @@ class ScoutManager
     bool                            _didGasSteal;
     bool                            _gasStealFinished;
 	bool							_cannonRushReady;
+	bool							_cannonRushDone;
 	bool							_initialCannonRushPylonDone;
 	bool							_nextProbeIsScout;
-	bool							_initialCannonRushCannonDone;
     int                             _currentRegionVertexIndex;
     int                             _previousScoutHP;
 	std::vector<BWAPI::Position>    _enemyRegionVertices;
@@ -55,6 +55,7 @@ public:
 	void onUnitMorph(BWAPI::Unit unit);
 
 	bool isCannonRushReady();
+	bool isCannonRushDone();
 	bool isNextProbeScout();
 	void setNextProbeScout(bool isScout);
 };

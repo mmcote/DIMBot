@@ -84,7 +84,7 @@ void BuildingManager::assignWorkersToUnassignedBuildings()
 			if (ScoutManager::Instance().getWorkerScout() != nullptr) {
 				sId = ScoutManager::Instance().getWorkerScout()->getID();
 			}
-			BWAPI::Broodwar->printf("VALID WORKER BEING ASSIGNED: %d (scout=%d)", workerToAssign->getID(), sId);
+			// BWAPI::Broodwar->printf("VALID WORKER BEING ASSIGNED: %d (scout=%d)", workerToAssign->getID(), sId);
 
             // TODO: special case of terran building whose worker died mid construction
             //       send the right click command to the buildingUnit to resume construction

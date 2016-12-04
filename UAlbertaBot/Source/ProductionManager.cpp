@@ -26,7 +26,9 @@ void ProductionManager::performBuildOrderSearch()
 	if (!Config::Modules::UsingBuildOrderSearch || !canPlanBuildOrderNow() 
 		|| Config::Strategy::StrategyName == "Protoss_CannonRush") // cannon rush doesn't need a new build plan
     {
-        return;
+		// can pick a new build order if the cannon rush is done
+		if (!ScoutManager::Instance().isCannonRushDone()) 
+			return;
     }
 
 	BuildOrder & buildOrder = BOSSManager::Instance().getBuildOrder();
@@ -734,7 +736,7 @@ void ProductionManager::queueGasSteal()
 
 void ProductionManager::queueCannonRushPylon() {
 	if (BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Protoss) {
-		_queue.clearAll();
+		//_queue.clearAll();
 
 		_queue.queueAsHighestPriority(MetaType(BWAPI::UnitTypes::Protoss_Pylon), true);
 	}
@@ -748,7 +750,7 @@ void ProductionManager::queueCannonRushCannon() {
 
 void ProductionManager::queueCannonRushNewScout() {
 	if (BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Protoss) {
-		_queue.clearAll();
+		//_queue.clearAll();
 		_queue.queueAsHighestPriority(MetaType(BWAPI::UnitTypes::Protoss_Probe), false);
 	}
 }

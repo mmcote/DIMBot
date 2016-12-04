@@ -126,97 +126,75 @@ void ScoutManager::moveScouts()
 	// if we know where the enemy region is and where our scout is
 	if (_workerScout && enemyBaseLocation)
 	{
-        if (Config::Strategy::StrategyName == "Protoss_CannonRush") 
+        if (Config::Strategy::StrategyName == "Protoss_CannonRush" || _cannonRushReady) 
 		{
-			double scoutDistanceToEnemy = _workerScout->getPosition().getDistance(enemyBaseLocation->getMinerals().getPosition());
-			bool scoutInRangeOfenemy = scoutDistanceToEnemy <= 400;
-
 			_scoutUnderAttack = false; // don't care if our scout is under attack because we're rushing
-			// if the scout is in the enemy region
-			if (scoutInRangeOfenemy)
-			{
-				// get the closest enemy worker
-				//BWAPI::Unit closestWorker = closestEnemyWorker();
 
-				//if (closestWorker && _workerScout->getDistance(closestWorker) < 800)
-				//{
-				//	_cannonRushReady = true;
-				//}
+			const std::set<BWTA::Chokepoint*>& chokepoints = enemyBaseLocation->getRegion()->getChokepoints();
+			if (chokepoints.size() > 0) {
+				BWTA::Chokepoint* chokepoint = *chokepoints.begin();
+				
+				double scoutDistanceToEnemy = _workerScout->getPosition().getDistance(chokepoint->getCenter());
+				bool scoutInRangeOfenemy = scoutDistanceToEnemy > -1 && scoutDistanceToEnemy <= 50;
 
-				if (enemyWorkerInRadius(800)) 
+				if (scoutInRangeOfenemy)
 				{
 					_cannonRushReady = true;
-				}
 
-				if (_cannonRushReady)
-				{
-					_scoutStatus = "Waiting for queue readiness";
-					if (_initialCannonRushPylonDone == false)
+					// find if a pylon is available nearby
+					// if not, build it first
+					// else, build photon cannons
+					BWAPI::Unitset nearbyUnits = _workerScout->getUnitsInRadius(250);
+					bool isPylonFound = false;
+					bool isPylonConstructing = false;
+					int cannonCount = 0;
+					for (auto& unit : nearbyUnits) {
+						if (unit->getType() == BWAPI::UnitTypes::Protoss_Pylon)
+						{
+							isPylonConstructing = true;
+							if (!unit->isBeingConstructed())
+							{
+								isPylonFound = true;
+
+								if (!_cannonRushDone) // queue cannons as fast as possible until done
+								{
+									ProductionManager::Instance().queueCannonRushCannon();
+									//ProductionManager::Instance().queueCannonRushCannon();
+								}
+								
+							}
+						}
+						else if (unit->getType() == BWAPI::UnitTypes::Protoss_Photon_Cannon)
+						{
+							++cannonCount;
+						}
+					}
+
+					if (cannonCount <= 10)
+					{
+						_cannonRushDone = false; // we need more cannons!
+					}
+					else
+					{
+						_cannonRushDone = true;
+						Config::Strategy::StrategyName = "Protoss_DragoonRush";
+					}
+
+					if (!isPylonFound && !isPylonConstructing)
 					{
 						ProductionManager::Instance().queueCannonRushPylon();
-						_initialCannonRushPylonDone = true;
-					}
-					else if (ProductionManager::Instance().isQueueEmpty())
-					{
-						if (_initialCannonRushPylonDone && !_initialCannonRushCannonDone)
-						{
-							BWAPI::Unitset nearbyUnits = _workerScout->getUnitsInRadius(100);
-							for (auto& unit : nearbyUnits) {
-								if (unit->getType() == BWAPI::UnitTypes::Protoss_Pylon)
-								{
-									if (!unit->isBeingConstructed())
-									{
-										_initialCannonRushCannonDone = true;
-										ProductionManager::Instance().queueCannonRushCannon();
-										ProductionManager::Instance().queueCannonRushCannon();
-									}
-								}
-							}
-
-							if (!_initialCannonRushCannonDone)
-							{
-								_scoutStatus = "Following perimeter while waiting for cannon rush pylon";
-								followPerimeter();
-							}
-						}
-						else
-						{
-							BWAPI::Unitset enemyMinerals = enemyBaseLocation->getMinerals();
-							std::vector<const BWAPI::Unit> pylons;
-							if (enemyMinerals.size() > 0) {
-								for (auto& mineral : enemyMinerals) {
-									BWAPI::Unitset unitsByMinerals = mineral->getUnitsInRadius(200);
-									for (auto& unit : unitsByMinerals) {
-										if (unit->getType() == BWAPI::UnitTypes::Protoss_Pylon)
-										{
-											pylons.push_back(unit);
-										}
-									}
-								}
-							}
-
-							if (pylons.empty())
-							{
-								ProductionManager::Instance().queueCannonRushPylon();
-							}
-							else
-							{
-								ProductionManager::Instance().queueCannonRushCannon();
-							}
-						}
 					}
 				}
 				else
 				{
-					_scoutStatus = "Following perimeter while waiting for cannon rush readiness";
-					followPerimeter();
+					_scoutStatus = "Seeking the chokepoint...";
+					Micro::SmartMove(_workerScout, chokepoint->getCenter());
 				}
 			}
-			// otherwise keep moving to the enemy region
 			else
 			{
+				// otherwise keep moving to the enemy region
 				_scoutStatus = "Enemy region known, going there";
-
 				// move to the enemy region
 				followPerimeter();
 			}
@@ -667,6 +645,10 @@ BWAPI::Unit ScoutManager::getWorkerScout()
 
 bool ScoutManager::isCannonRushReady() {
 	return _cannonRushReady;
+}
+
+bool ScoutManager::isCannonRushDone() {
+	return _cannonRushDone;
 }
 
 bool ScoutManager::isNextProbeScout() {
