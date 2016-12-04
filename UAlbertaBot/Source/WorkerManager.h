@@ -13,7 +13,6 @@ class WorkerManager
     WorkerData  workerData;
     BWAPI::Unit previousClosestWorker;
 
-    void        setMineralWorker(BWAPI::Unit unit);
     bool        isGasStealRefinery(BWAPI::Unit unit);
     
     void        handleIdleWorkers();
@@ -42,6 +41,7 @@ public:
     int         getNumMineralWorkers();
     int         getNumGasWorkers();
     int         getNumIdleWorkers();
+    void        setMineralWorker(BWAPI::Unit unit);
     void        setScoutWorker(BWAPI::Unit worker);
 
     bool        isWorkerScout(BWAPI::Unit worker);

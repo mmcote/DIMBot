@@ -133,62 +133,130 @@ void ScoutManager::moveScouts()
 			const std::set<BWTA::Chokepoint*>& chokepoints = enemyBaseLocation->getRegion()->getChokepoints();
 			if (chokepoints.size() > 0) {
 				BWTA::Chokepoint* chokepoint = *chokepoints.begin();
-				
-				double scoutDistanceToEnemy = _workerScout->getPosition().getDistance(chokepoint->getCenter());
-				bool scoutInRangeOfenemy = scoutDistanceToEnemy > -1 && scoutDistanceToEnemy <= 50;
 
-				if (scoutInRangeOfenemy)
+				if (!_cannonRushEnemyBaseExplored)
 				{
-					_cannonRushReady = true;
+					const BWAPI::Position& enemyBasePos = enemyBaseLocation->getRegion()->getCenter();
 
-					// find if a pylon is available nearby
-					// if not, build it first
-					// else, build photon cannons
-					BWAPI::Unitset nearbyUnits = _workerScout->getUnitsInRadius(250);
-					bool isPylonFound = false;
-					bool isPylonConstructing = false;
-					int cannonCount = 0;
-					for (auto& unit : nearbyUnits) {
-						if (unit->getType() == BWAPI::UnitTypes::Protoss_Pylon)
-						{
-							isPylonConstructing = true;
-							if (!unit->isBeingConstructed())
+					double scoutDistanceToEnemy = _workerScout->getPosition().getDistance(enemyBasePos);
+					bool scoutInRangeOfenemy = scoutDistanceToEnemy > -1 && scoutDistanceToEnemy <= 25;
+
+					if (scoutInRangeOfenemy)
+					{
+						BWAPI::Unitset nearbyUnits = _workerScout->getUnitsInRadius(500);
+						for (auto& unit : nearbyUnits) {
+							if (unit->getType() == BWAPI::UnitTypes::Terran_Marine || unit->getType() == BWAPI::UnitTypes::Terran_Barracks || unit->getType() == BWAPI::UnitTypes::Zerg_Spawning_Pool)
 							{
-								isPylonFound = true;
+								// Get out of there!
+								// Save our scout and modify our strategy quickly; a cannon rush isn't possible anymore!
 
-								if (!_cannonRushDone) // queue cannons as fast as possible until done
+								if (unit->getType().getRace() == BWAPI::Races::Terran)
 								{
-									ProductionManager::Instance().queueCannonRushCannon();
-									//ProductionManager::Instance().queueCannonRushCannon();
+									BWAPI::Broodwar->sendText("Haha do you really think you can beat me with a marine rush?");
 								}
-								
+								else
+								{
+									BWAPI::Broodwar->sendText("Haha do you really think you can beat me with a zergling rush?");
+								}
+
+								_cannonRushDone = true;
+
+								Micro::SmartMove(_workerScout, InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->self())->getRegion()->getCenter());
+								WorkerManager::Instance().setMineralWorker(_workerScout);
+								_workerScout = nullptr;
+								ProductionManager::Instance().queueCannonRushCannonHighPriority();
+								ProductionManager::Instance().queueCannonRushCannonHighPriority();
+								ProductionManager::Instance().queueCannonRushPylon();
+
+								if (unit->getType() == BWAPI::UnitTypes::Terran_Marine || unit->getType() == BWAPI::UnitTypes::Zerg_Spawning_Pool)
+								{
+									// We don't have a whole lot of time for a better strategy...
+									Config::Strategy::StrategyName = "Protoss_ZealotRush";
+								}
+								else
+								{
+									// Take some time to build a better unit in case it is a tank rush
+									Config::Strategy::StrategyName = "Protoss_DTRush";
+								}
+
+								_scoutStatus = "None";
+								return;
 							}
 						}
-						else if (unit->getType() == BWAPI::UnitTypes::Protoss_Photon_Cannon)
-						{
-							++cannonCount;
-						}
-					}
 
-					if (cannonCount <= 10)
-					{
-						_cannonRushDone = false; // we need more cannons!
+						_cannonRushEnemyBaseExplored = true;
 					}
 					else
 					{
-						_cannonRushDone = true;
-						Config::Strategy::StrategyName = "Protoss_DragoonRush";
-					}
-
-					if (!isPylonFound && !isPylonConstructing)
-					{
-						ProductionManager::Instance().queueCannonRushPylon();
+						_scoutStatus = "Seeking the enemy home base and determining a strategy...";
+						Micro::SmartMove(_workerScout, enemyBaseLocation->getRegion()->getCenter());
 					}
 				}
 				else
 				{
-					_scoutStatus = "Seeking the chokepoint...";
-					Micro::SmartMove(_workerScout, chokepoint->getCenter());
+					double scoutDistanceToEnemy = _workerScout->getPosition().getDistance(chokepoint->getCenter());
+					bool scoutInRangeOfenemy = scoutDistanceToEnemy > -1 && scoutDistanceToEnemy <= 25;
+
+					if (scoutInRangeOfenemy)
+					{
+						_cannonRushReady = true;
+
+						// find if a pylon is available nearby
+						// if not, build it first
+						// else, build photon cannons
+						BWAPI::Unitset nearbyUnits = _workerScout->getUnitsInRadius(500);
+						bool isPylonFound = false;
+						bool isPylonConstructing = false;
+						int cannonCount = 0;
+						for (auto& unit : nearbyUnits) {
+							if (unit->getType() == BWAPI::UnitTypes::Protoss_Pylon)
+							{
+								isPylonConstructing = true;
+								if (!unit->isBeingConstructed())
+								{
+									isPylonFound = true;
+
+									if (!_cannonRushDone) // queue cannons as fast as possible until done
+									{
+										ProductionManager::Instance().queueCannonRushCannon();
+									}
+								}
+							}
+							else if (unit->getType() == BWAPI::UnitTypes::Protoss_Photon_Cannon)
+							{
+								++cannonCount;
+							}
+						}
+
+						if (cannonCount <= 10)
+						{
+							_cannonRushDone = false; // we need more cannons!
+						}
+						else
+						{
+							_cannonRushDone = true;
+
+							// pick a decent strategy against cloaked units
+							if (InformationManager::Instance().enemyHasCloakedUnits())
+							{
+								Config::Strategy::StrategyName = "Protoss_DTRush";
+							}
+							else
+							{
+								Config::Strategy::StrategyName = "Protoss_DragoonRush";
+							}
+						}
+
+						if (!isPylonFound && !isPylonConstructing)
+						{
+							ProductionManager::Instance().queueCannonRushPylon();
+						}
+					}
+					else
+					{
+						_scoutStatus = "Seeking the chokepoint...";
+						Micro::SmartMove(_workerScout, chokepoint->getCenter());
+					}
 				}
 			}
 			else

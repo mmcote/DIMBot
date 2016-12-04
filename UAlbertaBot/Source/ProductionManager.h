@@ -56,6 +56,7 @@ public:
 
 	void		queueCannonRushPylon();
 	void		queueCannonRushCannon();
+	void		queueCannonRushCannonHighPriority();
 	void		queueCannonRushNewScout();
 
 	bool		isQueueEmpty();

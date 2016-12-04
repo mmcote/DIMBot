@@ -748,6 +748,12 @@ void ProductionManager::queueCannonRushCannon() {
 	}
 }
 
+void ProductionManager::queueCannonRushCannonHighPriority() {
+	if (BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Protoss) {
+		_queue.queueAsHighestPriority(MetaType(BWAPI::UnitTypes::Protoss_Photon_Cannon), true);
+	}
+}
+
 void ProductionManager::queueCannonRushNewScout() {
 	if (BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Protoss) {
 		//_queue.clearAll();

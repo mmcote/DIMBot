@@ -15,6 +15,9 @@ class ScoutManager
 	bool			                _scoutUnderAttack;
     bool                            _didGasSteal;
     bool                            _gasStealFinished;
+	bool							_cannonRushEnemyRushPrevented;
+	bool							_cannonRushEnemyInsultHurled;
+	bool							_cannonRushEnemyBaseExplored;
 	bool							_cannonRushReady;
 	bool							_cannonRushDone;
 	bool							_initialCannonRushPylonDone;
