@@ -6,7 +6,17 @@ namespace UAlbertaBot
 {
 class SquadData
 {
-	static BWAPI::Unit baitUnit;
+	static BWAPI::Unit baitPreventionUnit;
+	static BWAPI::Unit baitUnitSent;
+	static BWTA::Region * baitRegion;
+	static std::vector<BWAPI::Position> vertices;
+	static bool baitSent;
+	static bool mainAttackSqaudSent;
+	static bool baitMode;
+	static bool reachedBaitRegion;
+	static int gameStartTime;
+	static int priorHealth;
+	static int _currentRegionVertexIndex;
 	std::map<std::string, Squad> _squads;
 	std::map<std::string, Squad> _miniAttackSquads;
     void    updateAllSquads();
@@ -37,6 +47,16 @@ public:
     const std::map<std::string, Squad> & getSquads() const;
 
 	void			updateNeutralZoneAttackSquad();
+	void			updateBaitSquad(int releaseTime);
 	BWAPI::Unit		getBaitUnit();
+	BWAPI::Unit		getBaitUnitSent();
+	BWAPI::Unitset	getUnitsBaited();
+	int				getGameStartTime();
+	bool			getBaitSent();
+	bool			getMainAttackSquadSent();
+	void			followPerimeter();
+	BWAPI::Position getFleePosition();
+	int				getClosestVertexIndex(BWAPI::Unit unit);
+
 };
 }

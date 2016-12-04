@@ -81,9 +81,6 @@
     <ClCompile Include="..\source\WorkerData.cpp">
       <Filter>game\macro</Filter>
     </ClCompile>
-    <ClCompile Include="..\source\WorkerManager.cpp">
-      <Filter>game\macro</Filter>
-    </ClCompile>
     <ClCompile Include="..\source\DetectorManager.cpp">
       <Filter>game\combat\micro</Filter>
     </ClCompile>
@@ -152,6 +149,9 @@
     </ClCompile>
     <ClCompile Include="..\Source\Logger.cpp">
       <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\WorkerManager.cpp">
+      <Filter>game\macro</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
