@@ -44,7 +44,6 @@ void ScoutManager::update()
 		{
 			ProductionManager::Instance().queueCannonRushNewScout();
 			_nextProbeIsScout = true;
-			_cannonRushReady = false;
 			_workerScout = nullptr;
 			_numWorkerScouts = 0;
 		}
@@ -127,11 +126,11 @@ void ScoutManager::moveScouts()
 	// if we know where the enemy region is and where our scout is
 	if (_workerScout && enemyBaseLocation)
 	{
-        int scoutDistanceToEnemy = MapTools::Instance().getGroundDistance(_workerScout->getPosition(), enemyBaseLocation->getPosition());
-        bool scoutInRangeOfenemy = scoutDistanceToEnemy <= scoutDistanceThreshold;
-
-		if (Config::Strategy::StrategyName == "Protoss_CannonRush") 
+        if (Config::Strategy::StrategyName == "Protoss_CannonRush") 
 		{
+			double scoutDistanceToEnemy = _workerScout->getPosition().getDistance(enemyBaseLocation->getMinerals().getPosition());
+			bool scoutInRangeOfenemy = scoutDistanceToEnemy <= 400;
+
 			_scoutUnderAttack = false; // don't care if our scout is under attack because we're rushing
 			// if the scout is in the enemy region
 			if (scoutInRangeOfenemy)
@@ -224,6 +223,9 @@ void ScoutManager::moveScouts()
 		} 
 		else 
 		{
+			int scoutDistanceToEnemy = MapTools::Instance().getGroundDistance(_workerScout->getPosition(), enemyBaseLocation->getPosition());
+			bool scoutInRangeOfenemy = scoutDistanceToEnemy <= scoutDistanceThreshold;
+
 			// we only care if the scout is under attack within the enemy region
 			// this ignores if their scout worker attacks it on the way to their base
 			if (scoutHP < _previousScoutHP)
