@@ -84,8 +84,8 @@
         
         "ScoutGasSteal"             : false,
         "ScoutHarassEnemy"          : true,
-		"PreventBaiting"            : false,
-        "BaitEnemy"                 : true,
+	"PreventBaiting"            : false,
+        "BaitEnemy"                 : false,
         
         "ReadDirectory"             : "bwapi-data/read/",
         "WriteDirectory"            : "bwapi-data/write/",
