@@ -36,12 +36,11 @@ class Squad
 
     
 	BWAPI::Unit		getRegroupUnit();
-	BWAPI::Unit		unitClosestToEnemy();
+	
     
 	void                        updateUnits();
 	void                        addUnitsToMicroManagers();
 	void                        setNearEnemyUnits();
-	void                        setAllUnits();
 	
 	bool                        unitNearEnemy(BWAPI::Unit unit);
 	bool                        needsToRegroup();
@@ -63,9 +62,10 @@ public:
     size_t              getPriority() const;
     void                setPriority(const size_t & priority);
     const std::string & getName() const;
-    
+	BWAPI::Unit		unitClosestToEnemy();
 	BWAPI::Position     calcCenter();
 	BWAPI::Position     calcRegroupPosition();
+	void                        setAllUnits();
 
 	const BWAPI::Unitset &  getUnits() const;
 	const SquadOrder &  getSquadOrder()	const;

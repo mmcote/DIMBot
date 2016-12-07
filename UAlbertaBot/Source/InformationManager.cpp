@@ -511,6 +511,7 @@ bool InformationManager::isCombatUnit(BWAPI::UnitType type) const
 	return false;
 }
 
+
 void InformationManager::getNearbyForce(std::vector<UnitInfo> & unitInfo, BWAPI::Position p, BWAPI::Player player, int radius) 
 {
 	bool hasBunker = false;

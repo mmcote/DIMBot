@@ -141,6 +141,8 @@ void ParseUtils::ParseConfigFile(const std::string & filename)
         // read in the various strategic elements
         JSONTools::ReadBool("ScoutGasSteal", strategy, Config::Strategy::GasStealWithScout);
         JSONTools::ReadBool("ScoutHarassEnemy", strategy, Config::Strategy::ScoutHarassEnemy);
+		JSONTools::ReadBool("PreventBaiting", strategy, Config::Strategy::PreventBaiting);
+		JSONTools::ReadBool("BaitEnemy", strategy, Config::Strategy::BaitEnemy);
         JSONTools::ReadString("ReadDirectory", strategy, Config::Strategy::ReadDir);
         JSONTools::ReadString("WriteDirectory", strategy, Config::Strategy::WriteDir);
 

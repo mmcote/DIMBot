@@ -9,7 +9,6 @@ Squad::Squad()
     , _priority(0)
     , _name("Default")
 {
-    int a = 10;
 }
 
 Squad::Squad(const std::string & name, SquadOrder order, size_t priority) 
@@ -19,6 +18,7 @@ Squad::Squad(const std::string & name, SquadOrder order, size_t priority)
     , _lastRetreatSwitchVal(false)
     , _priority(priority)
 {
+	int a = 10;
 }
 
 Squad::~Squad()

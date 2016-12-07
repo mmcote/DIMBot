@@ -1,10 +1,11 @@
 #include "CombatCommander.h"
 #include "UnitUtil.h"
-
+#include "SquadData.h"
 using namespace UAlbertaBot;
 
 const size_t IdlePriority = 0;
 const size_t AttackPriority = 1;
+const size_t BaitPriority = 1;
 const size_t BaseDefensePriority = 2;
 const size_t ScoutDefensePriority = 3;
 const size_t DropPriority = 4;
@@ -17,6 +18,19 @@ CombatCommander::CombatCommander()
 
 void CombatCommander::initializeSquads()
 {
+	if (Config::Strategy::PreventBaiting) {
+		// the neutral zone attack squad will handle enemy units that try to bait our combat
+		// units to follow them around the map
+		SquadOrder neutralZoneAttackOrder(SquadOrderTypes::Attack, getMainAttackLocation(), 800, "Attack Enemy in Neutral Zone");
+		_squadData.addSquad("NeutralZoneAttack", Squad("NeutralZoneAttack", neutralZoneAttackOrder, AttackPriority));
+	}
+
+	if (Config::Strategy::BaitEnemy) {
+		// change the position of the bait squad, although this will do for now as we want to keep the enemy closer to their base
+		SquadOrder baitSquadOrder(SquadOrderTypes::Attack, getMainAttackLocation(), 800, "Bait Enemy in Neutral Zone");
+		_squadData.addSquad("Bait", Squad("Bait", baitSquadOrder, BaitPriority));
+	}
+
     SquadOrder idleOrder(SquadOrderTypes::Idle, BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation()), 100, "Chill Out");
 	_squadData.addSquad("Idle", Squad("Idle", idleOrder, IdlePriority));
 
@@ -67,6 +81,12 @@ void CombatCommander::update(const BWAPI::Unitset & combatUnits)
         updateScoutDefenseSquad();
 		updateDefenseSquads();
 		updateAttackSquads();
+		if (Config::Strategy::PreventBaiting) {
+			updateNeutralZoneAttackSquads();
+		}
+		if (Config::Strategy::BaitEnemy) {
+			updateBaitSquads();
+		}
 	}
 
 	_squadData.update();
@@ -85,10 +105,24 @@ void CombatCommander::updateIdleSquad()
     }
 }
 
+void CombatCommander::updateNeutralZoneAttackSquads()
+{
+	Squad & neutralZoneAttackSquad = _squadData.getSquad("NeutralZoneAttack");
+	SquadOrder neutralZoneAttackSquadOrder(SquadOrderTypes::Attack, getMainAttackLocation(), 800, "Attack Enemy Base");
+	neutralZoneAttackSquad.setSquadOrder(neutralZoneAttackSquadOrder);
+}
+
+void CombatCommander::updateBaitSquads()
+{
+	Squad & baitSquad = _squadData.getSquad("Bait");
+	SquadOrder baitSquadOrder(SquadOrderTypes::Attack, getMainAttackLocation(), 800, "Bait Enemy in Neutral Zone");
+	baitSquad.setSquadOrder(baitSquadOrder);
+}
+
 void CombatCommander::updateAttackSquads()
 {
     Squad & mainAttackSquad = _squadData.getSquad("MainAttack");
-
+	SquadData squadData = SquadData();
     for (auto & unit : _combatUnits)
     {
         if (unit->getType() == BWAPI::UnitTypes::Zerg_Scourge && UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Zerg_Hydralisk) < 30)
