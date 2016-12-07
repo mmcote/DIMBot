@@ -16,6 +16,7 @@ namespace UnitUtil
     bool CanAttack(BWAPI::Unit attacker, BWAPI::Unit target);
     bool CanAttack(BWAPI::UnitType attacker, BWAPI::UnitType target);
     double CalculateLTD(BWAPI::Unit attacker, BWAPI::Unit target);
+	double CalculateThreatVSHealthRatio(BWAPI::Unit enemy);
     int GetAttackRange(BWAPI::Unit attacker, BWAPI::Unit target);
     int GetAttackRange(BWAPI::UnitType attacker, BWAPI::UnitType target);
     int GetTransportSize(BWAPI::UnitType type);

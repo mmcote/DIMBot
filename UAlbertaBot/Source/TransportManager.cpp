@@ -22,7 +22,7 @@ void TransportManager::executeMicro(const BWAPI::Unitset & targets)
 		return;
 	}	
 
-	//update();
+	update();
 }
 
 void TransportManager::calculateMapEdgeVertices()
@@ -118,21 +118,12 @@ void TransportManager::drawTransportInformation(int x = 0, int y = 0)
 	}
 }
 
-void TransportManager::update(const SquadOrder & inputOrder)
+void TransportManager::update()
 {
-	//BWAPI::Broodwar->printf("update");
-
     if (!_transportShip && getUnits().size() > 0)
     {
         _transportShip = *getUnits().begin();
     }
-
-	/*
-	if (_transportShip)
-	{
-		BWAPI::Broodwar->printf(inputOrder.getStatus().c_str());
-	}
-	*/
 
 	// calculate enemy region vertices if we haven't yet
 	if (_mapEdgeVertices.empty())
@@ -192,19 +183,7 @@ void TransportManager::moveTransport()
 		else
 			followPerimeter();
 	}
-	
 
-	/*
-	// only move if valid to/from
-	if (_to.isValid() && _from.isValid())
-	{
-		followPerimeter(_to, _from);
-	}
-	else
-	{
-		followPerimeter();
-	}
-	*/
 }
 
 // Unloads troops if dying or close to enemy base

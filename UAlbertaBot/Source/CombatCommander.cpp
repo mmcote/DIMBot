@@ -8,6 +8,7 @@ const size_t AttackPriority = 1;
 const size_t BaseDefensePriority = 2;
 const size_t ScoutDefensePriority = 3;
 const size_t DropPriority = 4;
+const size_t DropAttackPriority = 5;
 
 CombatCommander::CombatCommander() 
     : _initialized(false)
@@ -31,18 +32,15 @@ void CombatCommander::initializeSquads()
     _squadData.addSquad("ScoutDefense", Squad("ScoutDefense", enemyScoutDefense, ScoutDefensePriority));
 
     // add a drop squad if we are using a drop strategy
-    if (Config::Strategy::StrategyName == "Protoss_Drop")
+	if (Config::Strategy::StrategyName == "Protoss_Drop" || Config::Strategy::StrategyName == "Protoss_DTDrop")
     {
-		SquadOrder Transport(SquadOrderTypes::Transport, ourBasePosition, 900, "Wait for drop squad");
-		_squadData.addSquad("Transport", Squad("Transport", Transport, DropPriority));
-
         SquadOrder zealotDrop(SquadOrderTypes::Drop, ourBasePosition, 900, "Wait for transport");
         _squadData.addSquad("Drop", Squad("Drop", zealotDrop, DropPriority));
 
 		// Drop attack squad attempts to attack enemy workers
 		// units only added to it when Drop squad units reach destination
-		SquadOrder dropAttack(SquadOrderTypes::DropAttack, getMainAttackLocation(), 900, "Drop Attack");
-		_squadData.addSquad("DropAttack", Squad("DropAttack", dropAttack, DropPriority));
+		SquadOrder dropAttack(SquadOrderTypes::DropAttack, getMainAttackLocation(), 800, "Drop Attack");
+		_squadData.addSquad("DropAttack", Squad("DropAttack", dropAttack, DropAttackPriority));
     }
 
     _initialized = true;
@@ -71,10 +69,10 @@ void CombatCommander::update(const BWAPI::Unitset & combatUnits)
 	{
         updateIdleSquad();
         updateDropSquads();
-		updateTransportSquads();
         updateScoutDefenseSquad();
 		updateDefenseSquads();
 		updateAttackSquads();
+		updateDropAttackSquads();
 	}
 
 	_squadData.update();
@@ -115,74 +113,69 @@ void CombatCommander::updateAttackSquads()
     mainAttackSquad.setSquadOrder(mainAttackOrder);
 }
 
-void CombatCommander::updateTransportSquads()
+void CombatCommander::updateDropAttackSquads()
 {
-	if (Config::Strategy::StrategyName != "Protoss_Drop")
+	if (Config::Strategy::StrategyName != "Protoss_Drop" && Config::Strategy::StrategyName != "Protoss_DTDrop")
 	{
 		return;
 	}
 
-	Squad & transportSquad = _squadData.getSquad("Transport");
-	auto & transportUnits = transportSquad.getUnits();
-
-	bool dropSquadHasTransport = false;
-
-	// check if there is a transport assigned
-	for (auto & unit : transportUnits)
-	{
-		if (unit->isFlying() && unit->getType().spaceProvided() > 0)
-		{
-			dropSquadHasTransport = true;
-		}
-		else
-		{
-			UAB_ASSERT_WARNING(false, "TransportSquad has non-transport unit");
-		}
-	}
-
-	// if no transport assigned, assign one
-	if (!dropSquadHasTransport)
-	{
-		for (auto & unit : _combatUnits)
-		{
-			// if this is a transport unit and we don't have one in the squad yet, add it
-			if (unit->getType().spaceProvided() > 0 && unit->isFlying())
-			{
-				_squadData.assignUnitToSquad(unit, transportSquad);
-				break;
-			}
-		}
-	}	
+	Squad & dropAttackSquad = _squadData.getSquad("DropAttack");
+	SquadOrder dropAttackOrder(SquadOrderTypes::DropAttack, getMainAttackLocation(), 800, "Drop Attack");
+	dropAttackSquad.setSquadOrder(dropAttackOrder);
 }
 
+void CombatCommander::dropSquadReassign(BWAPI::Unitset units)
+{
+	// If close to enemy base, attack enemy base, don't need to be part of drop squad anymore
+	BWAPI::Position enemyBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->enemy())->getPosition();
+	Squad &dropAttackSquad = _squadData.getSquad("DropAttack");
+
+	for (auto & unit : units)
+	{
+		if ((!unit->isFlying()) && enemyBaseLocation && (unit->getDistance(enemyBaseLocation) < 500))
+		{
+			_squadData.assignUnitToSquad(unit, dropAttackSquad);
+		}
+	}
+}
 
 void CombatCommander::updateDropSquads()
 {
-    if (Config::Strategy::StrategyName != "Protoss_Drop")
+	if (Config::Strategy::StrategyName != "Protoss_Drop" && Config::Strategy::StrategyName != "Protoss_DTDrop")
     {
         return;
     }
 
-	Squad & transportSquad = _squadData.getSquad("Transport");
     Squad & dropSquad = _squadData.getSquad("Drop");
 
     // figure out how many units the drop squad needs
     int transportSpotsRemaining = 8;
     auto & dropUnits = dropSquad.getUnits();
 
+	bool dropSquadHasTransport = false;
+
+	// If units in dropsquad are near enemy base, reassign them to DropAttack squad
+	dropSquadReassign(dropUnits);
+
     for (auto & unit : dropUnits)
     {
-		transportSpotsRemaining -= unit->getType().spaceRequired();
+		if (unit->isFlying() && unit->getType().spaceProvided() > 0)
+		{
+			dropSquadHasTransport = true;
+		}
+		else
+		{
+			transportSpotsRemaining -= unit->getType().spaceRequired();
+		}
     }
 
     // if there are still units to be added to the drop squad, do it
-    if (transportSpotsRemaining > 0)
-		//|| !dropSquadHasTransport)
+    if (transportSpotsRemaining > 0 || !dropSquadHasTransport)
     {
         // take our first amount of combat units that fill up a transport and add them to the drop squad
         for (auto & unit : _combatUnits)
         {
-			/*
             // if this is a transport unit and we don't have one in the squad yet, add it
             if (!dropSquadHasTransport && (unit->getType().spaceProvided() > 0 && unit->isFlying()))
             {
@@ -190,7 +183,6 @@ void CombatCommander::updateDropSquads()
                 dropSquadHasTransport = true;
                 continue;
             }
-			*/
 
             if (unit->getType().spaceRequired() > transportSpotsRemaining)
             {
@@ -199,9 +191,13 @@ void CombatCommander::updateDropSquads()
 
 			BWAPI::Position ourBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->self())->getPosition();
             // get every unit of a lower priority at our base and put it into the drop squad
-			if (!unit->getType().isWorker() && _squadData.canAssignUnitToSquad(unit, dropSquad) 
+			if (!unit->getType().isWorker() && _squadData.canAssignUnitToSquad(unit, dropSquad)
 				&& unit->getDistance(ourBaseLocation) < 500)
 			{
+				// if Dark Templar drop, only load Dark Templars
+				if (Config::Strategy::StrategyName == "Protoss_DTDrop" && unit->getType().getName() != "Protoss_Dark_Templar")
+				{	continue;	}
+
 				_squadData.assignUnitToSquad(unit, dropSquad);
 				transportSpotsRemaining -= unit->getType().spaceRequired();
             }
@@ -210,7 +206,7 @@ void CombatCommander::updateDropSquads()
     // otherwise the drop squad is full, so execute the order
     else
     {
-		BWAPI::Unit transport = transportSquad.getTransportShip();
+		BWAPI::Unit transport = dropSquad.getTransportShip();
 		BWAPI::Position enemyBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->enemy())->getPosition();
 		BWAPI::Position ourBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->self())->getPosition();
 
@@ -226,27 +222,6 @@ void CombatCommander::updateDropSquads()
 					{
 						// issue order to get in transport
 						Micro::SmartRightClick(unit, transport);
-					}
-				}
-			}
-		}
-		else
-		{
-			// If close to enemy base, attack enemy base, don't need to be part of drop squad anymore
-			if (enemyBaseLocation && (dropSquad.calcCenter().getDistance(enemyBaseLocation) < 500))
-			{
-				//BWAPI::Unitset dropUnits = dropSquad.getUnits();
-				Squad & dropAttackSquad = _squadData.getSquad("DropAttack");
-				BWAPI::Broodwar->printf("got squad");
-
-				for (auto & unit : dropSquad.getUnits())
-				{
-					if (!unit->isFlying() && (unit->getDistance(enemyBaseLocation) < 500))
-					{
-						// add this unit to DropAttack squad
-						// currently crashes trying to add unit (removing is fine though)
-						dropSquad.removeUnit(unit);
-						//_squadData.assignUnitToSquad(unit, dropAttackSquad);
 					}
 				}
 			}
