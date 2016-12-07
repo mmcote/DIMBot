@@ -164,17 +164,77 @@ void ScoutManager::moveScouts()
 				BWTA::Chokepoint* chokepoint = *chokepoints.begin();
 
 				double scoutDistanceToEnemyChokepoint = _workerScout->getPosition().getDistance(chokepoint->getCenter());
-				bool scoutInRangeOfChokePoint = scoutDistanceToEnemyChokepoint > -1 && scoutDistanceToEnemyChokepoint <= 300;
-				bool scoutInRangeOfCloserChokePoint = scoutDistanceToEnemyChokepoint > -1 && scoutDistanceToEnemyChokepoint <= 250;
+				bool scoutInRangeOfChokePoint = scoutDistanceToEnemyChokepoint > -1 && scoutDistanceToEnemyChokepoint <= 600;
+				bool scoutInRangeOfCloserChokePoint = scoutDistanceToEnemyChokepoint > -1 && scoutDistanceToEnemyChokepoint <= 550;
+				bool scoutOutOfRange = scoutDistanceToEnemyChokepoint > -1 && scoutDistanceToEnemyChokepoint > 600;
 
+				if (!_cannonRushReady && scoutOutOfRange) // check for a worker rush before cannon rush is ready
+				{
+					BWAPI::Unitset nearbyUnits = _workerScout->getUnitsInRadius(100);
+					int workerCount = 0;
+					for (auto& unit : nearbyUnits) {
+						if (unit->getType().isWorker())
+						{
+							if(BWAPI::Broodwar->enemy()->getUnits().contains(unit))
+								++workerCount;
+						}
+						else if (unit->isBeingConstructed() && (unit->getType() == BWAPI::UnitTypes::Zerg_Hatchery
+							|| unit->getType() == BWAPI::UnitTypes::Protoss_Nexus 
+							|| unit->getType() == BWAPI::UnitTypes::Terran_Command_Center) && BWAPI::Broodwar->enemy()->getUnits().contains(unit))
+						{ // Check if the enemy is expanding too fast for us to cannon rush
+							BWAPI::Broodwar->sendText("Haha do you really think you can beat me with an expansion rush?");
+
+							_cannonRushDone = true;
+
+							Micro::SmartMove(_workerScout, InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->self())->getRegion()->getCenter());
+
+							ProductionManager::Instance().queueCannonRushCannonHighPriority();
+							ProductionManager::Instance().queueCannonRushPylon();
+
+							WorkerManager::Instance().setMineralWorker(_workerScout);
+							_workerScout = nullptr;
+							Config::Strategy::StrategyName = "Protoss_DTRush";
+
+							return;
+						}
+					}
+
+					if (workerCount >= 3)
+					{
+						BWAPI::Broodwar->sendText("Haha do you really think you can beat me with a worker rush?");
+
+						_cannonRushDone = true;
+
+						Micro::SmartMove(_workerScout, InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->self())->getRegion()->getCenter());
+
+						ProductionManager::Instance().queueCannonRushCannonHighPriority();
+						ProductionManager::Instance().queueCannonRushCannonHighPriority();
+						ProductionManager::Instance().queueCannonRushPylon();
+
+						WorkerManager::Instance().setMineralWorker(_workerScout);
+						_workerScout = nullptr;
+						Config::Strategy::StrategyName = "Protoss_DTRush";
+
+						return;
+					}
+				}
+				
 				if (scoutInRangeOfChokePoint && _cannonRushChokepoint == BWAPI::TilePositions::Unknown) {
-					_cannonRushChokepoint = _workerScout->getTilePosition();
-					_cannonRushChokepointPos = _workerScout->getPosition();
+					bool canBuild = BWAPI::Broodwar->canBuildHere(_workerScout->getTilePosition(), BWAPI::UnitTypes::Protoss_Pylon, _workerScout);
+					if (canBuild)
+					{
+						_cannonRushChokepoint = _workerScout->getTilePosition();
+						_cannonRushChokepointPos = _workerScout->getPosition();
+					}
 				}
 
 				if (scoutInRangeOfCloserChokePoint && _cannonRushChokepointCloser == BWAPI::TilePositions::Unknown) {
-					_cannonRushChokepointCloser = _workerScout->getTilePosition();
-					_cannonRushChokepointPosCloser = _workerScout->getPosition();
+					bool canBuild = BWAPI::Broodwar->canBuildHere(_workerScout->getTilePosition(), BWAPI::UnitTypes::Protoss_Pylon, _workerScout);
+					if (canBuild)
+					{
+						_cannonRushChokepointCloser = _workerScout->getTilePosition();
+						_cannonRushChokepointPosCloser = _workerScout->getPosition();
+					}
 				}
 
 				if (!_cannonRushEnemyBaseExplored)
@@ -301,6 +361,7 @@ void ScoutManager::moveScouts()
 							ProductionManager::Instance().queueCannonRushCannonHighPriority();
 
 							WorkerManager::Instance().setMineralWorker(_workerScout);
+							_scoutStatus = "None";
 							_workerScout = nullptr;
 
 							// pick a decent strategy against cloaked units
