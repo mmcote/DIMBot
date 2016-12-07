@@ -19,7 +19,7 @@ class CombatCommander
 	void            updateAttackSquads();
 	void			updateNeutralZoneAttackSquads();
 	void			updateBaitSquads();
-
+	void			updateDropAttackSquads();
     void            updateDropSquads();
 	void            updateIdleSquad();
 	bool            isSquadUpdateFrame();
@@ -31,6 +31,7 @@ class CombatCommander
 	BWAPI::Position getDefendLocation();
     BWAPI::Position getMainAttackLocation();
 
+	void			dropSquadReassign(BWAPI::Unitset units);
     void            initializeSquads();
     void            verifySquadUniqueMembership();
     void            assignFlyingDefender(Squad & squad);

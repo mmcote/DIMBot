@@ -63,6 +63,8 @@ public:
     void                setPriority(const size_t & priority);
     const std::string & getName() const;
 	BWAPI::Unit		unitClosestToEnemy();
+	const BWAPI::Unit	getTransportShip() const;
+
 	BWAPI::Position     calcCenter();
 	BWAPI::Position     calcRegroupPosition();
 	void                        setAllUnits();

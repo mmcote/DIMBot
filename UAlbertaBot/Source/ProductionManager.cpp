@@ -694,3 +694,4 @@ bool ProductionManager::canPlanBuildOrderNow() const
 
     return true;
 }
+

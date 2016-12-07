@@ -7,16 +7,15 @@ namespace Config
     {
         bool ConfigFileFound                = false;
         bool ConfigFileParsed               = false;
-        //std::string ConfigFileLocation      = "bwapi-data/AI/DIMBot_Config.txt";
-		std::string ConfigFileLocation      = "C:/Users/mmcote/Documents/GitHub/DIMBot/DIMBot/UAlbertaBot/UAlbertaBot_Config.txt";
-	}
+		std::string ConfigFileLocation		= "bwapi-data/AI/DIMBot_Config.txt";
+    }
 
     namespace Strategy
     {
-        std::string ProtossStrategyName     = "Protoss_ZealotRush";
+        std::string ProtossStrategyName     = "Protoss_Drop";
         std::string TerranStrategyName      = "Terran_MarineRush";
         std::string ZergStrategyName        = "Zerg_3HatchMuta";
-        std::string StrategyName            = "Protoss_ZealotRush";
+        std::string StrategyName            = "Protoss_Drop";
         std::string ReadDir                 = "bwapi-data/read/";
         std::string WriteDir                = "bwapi-data/write/";
         bool GasStealWithScout              = false;
@@ -44,8 +43,8 @@ namespace Config
 
     namespace BotInfo
     {
-        std::string BotName                 = "UAlbertaBot";
-        std::string Authors                 = "Dave Churchill";
+        std::string BotName                 = "DIMBot";
+		std::string Authors 				= "David Yee, Ian Wark, Michael Cote";
         bool PrintInfoOnStart               = false;
     }
 
