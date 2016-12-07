@@ -8,17 +8,19 @@ class SquadData
 {
 	static BWAPI::Unit baitPreventionUnit;
 	static BWAPI::Unit baitUnitSent;
+	static BWAPI::Unit baitedEnemyUnit;
 	static BWTA::Region * baitRegion;
-	static std::vector<BWAPI::Position> vertices;
-	static bool baitSent;
-	static bool mainAttackSqaudSent;
 	static bool baitMode;
 	static bool reachedBaitRegion;
-	static int gameStartTime;
+	static int baitCreationTime;
+	static int suitableBaitRegion;
 	static int priorHealth;
-	static int _currentRegionVertexIndex;
 	std::map<std::string, Squad> _squads;
 	std::map<std::string, Squad> _miniAttackSquads;
+	static int _currentRegionVertexIndex;
+	static std::vector<BWAPI::Position> vertices;
+
+
     void    updateAllSquads();
     void    verifySquadUniqueMembership();
 
@@ -57,6 +59,6 @@ public:
 	void			followPerimeter();
 	BWAPI::Position getFleePosition();
 	int				getClosestVertexIndex(BWAPI::Unit unit);
-
+	BWTA::Region *	findBaitRegion();
 };
 }

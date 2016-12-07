@@ -60,9 +60,6 @@
     <ClCompile Include="..\Source\SquadData.cpp">
       <Filter>game\combat\squad</Filter>
     </ClCompile>
-    <ClCompile Include="..\Source\CombatSimulation.cpp">
-      <Filter>game\combat</Filter>
-    </ClCompile>
     <ClCompile Include="..\Source\Common.cpp">
       <Filter>common</Filter>
     </ClCompile>
@@ -152,6 +149,9 @@
     </ClCompile>
     <ClCompile Include="..\source\WorkerManager.cpp">
       <Filter>game\macro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Source\CombatSimulation.cpp">
+      <Filter>game\combat</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

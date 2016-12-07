@@ -4,21 +4,18 @@ using namespace UAlbertaBot;
 
 BWAPI::Unit SquadData::baitPreventionUnit = NULL;
 BWAPI::Unit SquadData::baitUnitSent = NULL;
+BWAPI::Unit SquadData::baitedEnemyUnit= NULL;
+
 std::vector<BWAPI::Position> SquadData::vertices;
 BWTA::Region * SquadData::baitRegion = nullptr;
-int SquadData::gameStartTime = NULL;
 int SquadData::_currentRegionVertexIndex = -1;
-bool SquadData::baitSent = false;
-bool SquadData::mainAttackSqaudSent = false;
 bool SquadData::baitMode = false;
 bool SquadData::reachedBaitRegion = false;
+int SquadData::suitableBaitRegion = 2;
 int SquadData::priorHealth = NULL;
-
+int SquadData::baitCreationTime = NULL;
 SquadData::SquadData() 
 {
-	if (gameStartTime == NULL) {
-		gameStartTime = 0;
-	}
 }
 
 void SquadData::update()
@@ -85,6 +82,7 @@ void SquadData::addSquad(const std::string & squadName, const Squad & squad)
 	_squads[squadName] = squad;
 }
 
+/* This function grabs all of the enemy units in the neutral zone */
 std::vector<BWAPI::Unit> grabEnemiesInNeutralZone(int radius) {
 	BWTA::BaseLocation * enemyBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->enemy());
 	auto enemyBasePosition = enemyBaseLocation->getPosition();
@@ -110,6 +108,7 @@ std::vector<BWAPI::Unit> grabEnemiesInNeutralZone(int radius) {
 	return validEnemyUnits;
 }
 
+/* This function grabs all of our units in the neutral zone */
 std::vector<BWAPI::Unit> grabAlliesInNeutralZone(BWAPI::Unitset ourUnits, int radius) {
 	BWTA::BaseLocation * homeBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->self());
 	auto homeBasePosition = homeBaseLocation->getPosition();
@@ -124,6 +123,7 @@ std::vector<BWAPI::Unit> grabAlliesInNeutralZone(BWAPI::Unitset ourUnits, int ra
 	return squadUnits;
 }
 
+/* This function checks if any of our units are in the enemy base */
 bool checkIfInEnemyBase(BWAPI::Unitset ourUnits, int radius) {
 	BWTA::BaseLocation * enemyBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->enemy());
 	auto enemyBasePosition = enemyBaseLocation->getPosition();
@@ -201,6 +201,8 @@ void SquadData::updateNeutralZoneAttackSquad() {
 	}
 }
 
+/* This function was adapted from the similar function in ScoutManager, although this version
+finds the vertices of any given region rather than just the enemy base */
 std::vector<BWAPI::Position> calculateBaitRegionVertices(BWTA::Region * region)
 {
 	const BWAPI::Position basePosition = BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation());
@@ -335,6 +337,7 @@ std::vector<BWAPI::Position> calculateBaitRegionVertices(BWTA::Region * region)
 	return resultingVertices;
 }
 
+/* This function was adapted from the similar function in ScoutManager */
 int SquadData::getClosestVertexIndex(BWAPI::Unit unit)
 {
 	int closestIndex = -1;
@@ -353,11 +356,10 @@ int SquadData::getClosestVertexIndex(BWAPI::Unit unit)
 	return closestIndex;
 }
 
+/* This function was adapted from the similar function in ScoutManager */
 BWAPI::Position SquadData::getFleePosition()
 {
 	UAB_ASSERT_WARNING(!vertices.empty(), "We should have an enemy region vertices if we are fleeing");
-
-	BWTA::BaseLocation * enemyBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->enemy());
 
 	// if this is the first flee, we will not have a previous perimeter index
 	if (_currentRegionVertexIndex == -1)
@@ -396,6 +398,7 @@ BWAPI::Position SquadData::getFleePosition()
 
 }
 
+/* This function was adapted from the similar function in ScoutManager */
 void SquadData::followPerimeter()
 {
 	BWAPI::Position fleeTo = getFleePosition();
@@ -408,77 +411,131 @@ void SquadData::followPerimeter()
 	Micro::SmartMove(baitUnitSent, fleeTo);
 }
 
+/* This function serves two purposes, one to find and return the optimal
+region to perform the bait maneuver. On the other hand this will also be
+used to check at the beginning of the game if we should attempt to bait the
+enemy as if it cannot find a region which meets the requirements given
+then it will return a nullptr to signify, run the bot as normal. */
+BWTA::Region * SquadData::findBaitRegion() {
+	BWTA::BaseLocation * enemyBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->enemy());
+	auto enemyBasePosition = enemyBaseLocation->getPosition();
+	BWTA::Region * enemyRegion = BWTA::getRegion(enemyBasePosition);
+
+	std::vector<BWTA::Region *> surroundingRegions;
+	for (auto region : enemyRegion->getReachableRegions()) {
+		surroundingRegions.push_back(region);
+	}
+
+	/* If we start with the enemy base region then it will be easy to beat the
+	first condition of the suitable region criteria */
+	BWTA::Region * tempRegion = BWTA::getRegion(enemyBasePosition);
+	bool suitableRegionFound = false;
+
+	for (auto region : surroundingRegions) {
+		/* The requirements for a suitable region for baiting:
+			- the region under consideration should be farther away laterally
+			- the region should be close to the side of the map the enemy is on
+			- the region needs to be big enough to circle around with a large
+			amount of trailing units
+		*/
+		if (abs(enemyBasePosition.x - region->getCenter().x) < 2250 &&
+			(abs(enemyBasePosition.x - region->getCenter().x) >
+			abs(enemyBasePosition.x - tempRegion->getCenter().x)) &&
+			(abs(enemyBasePosition.y - region->getCenter().y) < 2000) &&
+			calculateBaitRegionVertices(region).size() >= 70 &&
+			region != enemyRegion) {
+			tempRegion = region;
+			suitableRegionFound = true;
+		}
+	}
+
+	/* Return a nullptr if there is no suitable region, 
+	else return the bait region */
+	if (suitableRegionFound) {
+		return tempRegion;
+	} else {
+		return nullptr;
+	}
+}
+
 void SquadData::updateBaitSquad(int releaseTime) {
 	Squad *baitSquad = &getSquad("Bait");
 
-	/* FIRST */
+	/* FIRST STEP*/
 	/* If there are no units then just return */
 	if (baitSquad->getUnits().size() <= 0) {
 		return;
 	}
+	else if (baitCreationTime == NULL) {
+		baitCreationTime = BWAPI::Broodwar->getFrameCount();
+	}
 	/* SECOND */
-	/* Check if our bait unit is still alive */
+	/* Update if our bait unit is still alive */
 	baitSquad->setAllUnits();
 	
 	/* THIRD */
 	/* Release any units if the time has run out */
 	BWAPI::Unitset ourUnits = baitSquad->getUnits();
-	
+
+	/* if the bait unit has been killed then do not
+	bother trying to bait again, just continue with the
+	main attack squad */
 	if (ourUnits.size() <= 0) {
-		baitSent = false;
+		suitableBaitRegion = 0;
 	}
 
 	/* FOURTH */
 	/* Update for when we are still within the bait time limit */
-	if (BWAPI::Broodwar->getFrameCount() - gameStartTime < releaseTime) {
-		int enemyBaseRadius = 1050;
-		BWTA::BaseLocation * enemyBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->enemy());
-		auto enemyBasePosition = enemyBaseLocation->getPosition();
-		BWTA::Region * enemyRegion = BWTA::getRegion(enemyBasePosition);
-		///* Stop the enemy unit at the edge of the enemy base and then wait to be attacked (CHECK IF COMBAT UNIT) */
-		//if (baitUnitSent->isMoving() && enemyBasePosition.getDistance(baitUnitSent->getPosition()) < enemyBaseRadius) {
-		//	baitUnitSent->stop();
-		//	baitMode = true;
-		//}
-		
-		// TODO: Do not just send to new region everytime hit, only do once
-		// and then don't do again, one attempt at baiting the enemy
-		int currentHealth = baitUnitSent->getHitPoints();
+	if (BWAPI::Broodwar->getFrameCount() < releaseTime + 1500) {
+		bool isCombatUnitAttacking = false;
 		if (priorHealth - baitUnitSent->getHitPoints() > 0 && !baitMode) {
-			BWAPI::Position currentBaitUnitPosition = baitUnitSent->getPosition();
-			BWTA::Region * region = BWTA::getRegion(currentBaitUnitPosition);
+			// Enemy's unit info from InformationManager
+			InformationManager infoManager = InformationManager::Instance();
+			const auto & enemyUnitInfo = infoManager.getUnitInfo(BWAPI::Broodwar->enemy());
 
-			std::vector<BWTA::Region *> surroundingRegions;
-			for (auto region : region->getReachableRegions()) {
-				surroundingRegions.push_back(region);
-			}
-			baitRegion = surroundingRegions[0];
-			for (auto region : surroundingRegions) {
-				int tempSize = calculateBaitRegionVertices(region).size();
-				int temp = abs(currentBaitUnitPosition.y - region->getCenter().y);
-				if ((abs(currentBaitUnitPosition.x - region->getCenter().x) >
-					abs(currentBaitUnitPosition.x - baitRegion->getCenter().x)) &&
-					(abs(currentBaitUnitPosition.y - region->getCenter().y) < 1000) &&
-					calculateBaitRegionVertices(region).size() >= 70 && 
-					region != enemyRegion) {
-					baitRegion = region;
+			// Create vector of attacking enemy units 
+			// - That are a valid combat unit
+			// - Are currently visible to our units
+			// - Unit within 50 (Currently attacking the unit)
+			std::vector<BWAPI::Unit> attackingEnemyUnits;
+			for (auto & enemyUnit : enemyUnitInfo) {
+				if (infoManager.isCombatUnit(enemyUnit.second.type) &&
+					enemyUnit.second.unit->isVisible(BWAPI::Broodwar->self()) &&
+					baitUnitSent->getPosition().getDistance(enemyUnit.second.lastPosition) < 50) {
+					attackingEnemyUnits.push_back(enemyUnit.second.unit);
 				}
 			}
+
+			if (attackingEnemyUnits.size() > 0) {
+				baitedEnemyUnit = attackingEnemyUnits[0];
+				isCombatUnitAttacking = true;
+			}
+		}
+
+		if (isCombatUnitAttacking) {
+			baitRegion = findBaitRegion();
 			
-			baitMode = true;
-			baitUnitSent->move(baitRegion->getCenter());
-			vertices = calculateBaitRegionVertices(baitRegion);
+			if (baitRegion != nullptr) {
+				baitMode = true;
+				baitUnitSent->move(baitRegion->getCenter());
+				vertices = calculateBaitRegionVertices(baitRegion);
+			}
 		}
 
 		/* check if the unit has reached the bait region */
-		if (baitRegion != nullptr && !reachedBaitRegion && baitUnitSent->getPosition() == baitRegion->getCenter()) {
+		double xdist = abs(baitRegion->getCenter().x - baitUnitSent->getPosition().x);
+		double ydist = abs(baitRegion->getCenter().y - baitUnitSent->getPosition().y);
+		if (baitRegion != nullptr && !reachedBaitRegion && 
+			abs(baitRegion->getCenter().x - baitUnitSent->getPosition().x) < 50 &&
+			abs(baitRegion->getCenter().y - baitUnitSent->getPosition().y) < 50) {
 			reachedBaitRegion = true;
-		}		
+		}
+
 	/* FIFTH */
 	/* Update for when the bait time has run out */
-	/* Give an extra 500 frames to let the rest of the mainAttackSquad catch up to
+	/* Give an extra 1000 frames to let the rest of the mainAttackSquad catch up to
 	the enemy base */
-	} else if (BWAPI::Broodwar->getFrameCount() - gameStartTime > releaseTime + 500) {
+	} else if (BWAPI::Broodwar->getFrameCount() > releaseTime + 1500) {
 		/* Release bait unit to the mainAttackSquad */
 		Squad *mainAttackSquad = &getSquad("MainAttack");
 		
@@ -488,6 +545,7 @@ void SquadData::updateBaitSquad(int releaseTime) {
 
 		baitSquad->clear();
 		baitMode = false;
+		suitableBaitRegion = 0;
 	}
 
 	/* if the unit has reached the bait region then start circling */
@@ -505,39 +563,54 @@ void SquadData::updateAllSquads()
 {
 	for (auto & kv : _squads)
 	{
-		if (Config::Strategy::BaitEnemy) {
-			/* Define when the mainAttackSquad should be released */
-			int releaseMainAttackSquad = 8000; // frames (20 frames/sec)
-
+		if (Config::Strategy::BaitEnemy && suitableBaitRegion != 0) {
+			/* Define when the mainAttackSquad should be released (Emperically found) */
+			int estimatedAttackSquadReleaseTime = 5750; // frames (20 frames/sec)
+			if (baitCreationTime != NULL) {
+				/* Give the bait unit 2500 frames to execute the bait maneuver */
+				estimatedAttackSquadReleaseTime = baitCreationTime + 2500;
+			}
 			/* Update the bait squad */
 			if (!std::strcmp(kv.second.getName().c_str(), "Bait")) {
-				updateBaitSquad(releaseMainAttackSquad);
+				updateBaitSquad(estimatedAttackSquadReleaseTime);
 				continue;
 			}
 
 			/* Only control hold the mainAttackSquad for the specified amount of frames */
-			if (BWAPI::Broodwar->getFrameCount() - gameStartTime < releaseMainAttackSquad &&
+			if (BWAPI::Broodwar->getFrameCount() < estimatedAttackSquadReleaseTime &&
 				!std::strcmp(kv.second.getName().c_str(), "MainAttack") &&
-				kv.second.getUnits().size() != 0) {
-				if (!baitSent) {
+				kv.second.getUnits().size() != 0 &&
+				suitableBaitRegion != 0) {
+				
+				/* On the first frame we will check if a bait region exists */
+				if (suitableBaitRegion == 2) {
+					baitRegion = findBaitRegion();
+
+					if (baitRegion == nullptr) {
+						suitableBaitRegion = 0;
+					}
+					else {
+						suitableBaitRegion = 1;
+					}
+				}
+
+				/* If the bait hasn't been sent check requirements to bait
+				enemy are not broken */
+				if (baitUnitSent == NULL && suitableBaitRegion == 1) {
 					/* Grab the bait squad*/
 					Squad *baitSquad = &getSquad("Bait");
-
 
 					/* Size of radius to find enemies within */
 					int radius = 1000;
 
 					/* Grab our own units information */
 					BWAPI::Unitset ourUnits = kv.second.getUnits();
-
-					/* Grab all of our units */
-					std::vector<BWAPI::Unit> squadUnits = grabAlliesInNeutralZone(ourUnits, radius);
 					std::vector<BWAPI::Unit> allUnits;
 					for (auto & unit : ourUnits) {
 						allUnits.push_back(unit);
 					}
 
-					/* Definitely shouldn't be any of our units in the enemy base, but check anyways */
+					/* Shouldn't be any of our units in the enemy base */
 					bool alreadyInEnemyBase = checkIfInEnemyBase(ourUnits, radius);
 
 					/* Only if the bait wasn't sent yet and there are no units in the enemy base */
@@ -555,24 +628,13 @@ void SquadData::updateAllSquads()
 
 						/* Move towards the enemy base */
 						Micro::SmartAttackMove(baitUnitSent, enemyBasePosition);
-
-						/* Unit has been sent */
-						baitSent = true;
 					}
 				}
 				/* Skip updating the main attack squad since they are on hold until the required time */
-				continue;
+				if (suitableBaitRegion != 0) {
+					continue;
+				}
 			}
-
-			// TODO: let the Main Attack Squad attack the enemy base
-				
-
-			// next need to find a place to drag the unit to
-			// next need to circle the area, trying to avoid dying
-			/* next after a certain number have been collected, send the
-			main attack squad to put on pressure */
-
-			// put the main attack squad back with teh 
 		}
 
 		if (Config::Strategy::PreventBaiting) {
@@ -615,27 +677,25 @@ void SquadData::updateAllSquads()
 					int enemyCount = enemyAllies.first.size();
 					int ourCount = enemyAllies.second.size();
 
-					// TODO: If there is already an Neutral Zone Attack Squad how should we add to
-					// it if we have to?
+					//std::stringstream ss;
+					//ss << enemyCount;
+					//std::string enemyCountString = ss.str();
+					//ss << ourCount;
+					//std::string friendlyCountString = ss.str();
+					//char result[100];   // array to hold the result.
 
-					std::stringstream ss;
-					ss << enemyCount;
-					std::string enemyCountString = ss.str();
-					ss << ourCount;
-					std::string friendlyCountString = ss.str();
-					char result[100];   // array to hold the result.
-
-					strcpy(result, "Enemy Count: ");
-					strcat(result, enemyCountString.c_str());
-					strcat(result, " Friendly Count: ");
-					strcat(result, friendlyCountString.c_str());
-					UAB_ASSERT_WARNING(false, result);
+					//strcpy(result, "Enemy Count: ");
+					//strcat(result, enemyCountString.c_str());
+					//strcat(result, " Friendly Count: ");
+					//strcat(result, friendlyCountString.c_str());
+					//UAB_ASSERT_WARNING(false, result);
 
 					/* Use the branching Neutral Zone Attack Squad to handle enemies in the neutral zone */
 					Squad & neutralAttackSquad = getSquad("NeutralZoneAttack");
 
 					if (enemyCount == 1 && ourCount >= 1 && neutralAttackSquad.getUnits().size() == 0) {
-						/*
+						/* ---------------------------------------------------------------------------------
+						NOTE:
 							The code between the lines of ~236 - 266, was originally how I intended to
 							implement the decision of how many units will be assigned to the Neutral Zone
 							Attack Squad.
@@ -644,7 +704,8 @@ void SquadData::updateAllSquads()
 							unit and run the sparcraft simulation. Using the smallest radius to decide how
 							many units were needed to defeat the lone bait unit. Hence smaller radius, less
 							units needed to get rid of the bait unit.
-							*/
+						--------------------------------------------------------------------------------- */
+
 						// first find out how many units are needed to defeat the bait unit with a sparcraft simulation
 						/*
 						bool win = false;
@@ -839,14 +900,3 @@ BWAPI::Unit SquadData::getBaitUnit() {
 BWAPI::Unit SquadData::getBaitUnitSent() {
 	return baitPreventionUnit;
 }
-
-int	SquadData::getGameStartTime() {
-	return gameStartTime;
-}
-bool SquadData::getBaitSent() {
-	return baitSent;
-}
-bool SquadData::getMainAttackSquadSent() {
-	return mainAttackSqaudSent;
-}
-
