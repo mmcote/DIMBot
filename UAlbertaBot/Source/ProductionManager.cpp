@@ -378,7 +378,17 @@ void ProductionManager::create(BWAPI::Unit producer, BuildOrderItem & item)
 					position = ScoutManager::Instance().getWorkerScout()->getTilePosition();
 				}
 			}
+
+			if (ScoutManager::Instance().isCannonRushDone()){
+				BWAPI::Unit unit = WorkerManager::Instance().getMineralWorker();
+				if (unit != nullptr)
+				{
+					position = unit->getTilePosition();
+				}
+			}
 		}
+
+		
 
 		BuildingManager::Instance().addBuildingTask(t.getUnitType(), position, item.isGasSteal);
     }

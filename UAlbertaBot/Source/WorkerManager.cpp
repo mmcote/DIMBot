@@ -381,6 +381,29 @@ BWAPI::Unit WorkerManager::getGasWorker(BWAPI::Unit refinery)
 	return closestWorker;
 }
 
+BWAPI::Unit WorkerManager::getMineralWorker()
+{
+	BWAPI::Unit closestWorker = nullptr;
+	double closestDistance = 0;
+
+	for (auto & unit : workerData.getWorkers())
+	{
+		UAB_ASSERT(unit != nullptr, "Unit was null");
+
+		if (workerData.getWorkerJob(unit) == WorkerData::Minerals)
+		{
+			double distance = unit->getDistance(BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation()));
+			if (!closestWorker || distance < closestDistance)
+			{
+				closestWorker = unit;
+				closestDistance = distance;
+			}
+		}
+	}
+
+	return closestWorker;
+}
+
  void WorkerManager::setBuildingWorker(BWAPI::Unit worker, Building & b)
  {
      UAB_ASSERT(worker != nullptr, "Worker was null");
@@ -732,6 +755,11 @@ void WorkerManager::drawWorkerInformation(int x, int y)
 bool WorkerManager::isFree(BWAPI::Unit worker)
 {
     UAB_ASSERT(worker != nullptr, "Worker was null");
+
+	if (Config::Strategy::StrategyName == "Protoss_CannonRush")
+	{
+		if (ScoutManager::Instance().getWorkerScout() == worker) return false;
+	}
 
 	return workerData.getWorkerJob(worker) == WorkerData::Minerals || workerData.getWorkerJob(worker) == WorkerData::Idle;
 }

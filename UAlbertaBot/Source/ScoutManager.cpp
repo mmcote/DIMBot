@@ -205,11 +205,13 @@ void ScoutManager::moveScouts()
 								_cannonRushDone = true;
 
 								Micro::SmartMove(_workerScout, InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->self())->getRegion()->getCenter());
-								WorkerManager::Instance().setMineralWorker(_workerScout);
-								_workerScout = nullptr;
+								
 								ProductionManager::Instance().queueCannonRushCannonHighPriority();
 								ProductionManager::Instance().queueCannonRushCannonHighPriority();
 								ProductionManager::Instance().queueCannonRushPylon();
+
+								WorkerManager::Instance().setMineralWorker(_workerScout);
+								_workerScout = nullptr;
 
 								if (unit->getType() == BWAPI::UnitTypes::Terran_Marine || unit->getType() == BWAPI::UnitTypes::Zerg_Spawning_Pool)
 								{
@@ -294,6 +296,13 @@ void ScoutManager::moveScouts()
 						{
 							_cannonRushDone = true;
 
+							ProductionManager::Instance().queueCannonRushPylon();
+							ProductionManager::Instance().queueCannonRushCannonHighPriority();
+							ProductionManager::Instance().queueCannonRushCannonHighPriority();
+
+							WorkerManager::Instance().setMineralWorker(_workerScout);
+							_workerScout = nullptr;
+
 							// pick a decent strategy against cloaked units
 							if (InformationManager::Instance().enemyHasCloakedUnits())
 							{
@@ -303,9 +312,6 @@ void ScoutManager::moveScouts()
 							{
 								Config::Strategy::StrategyName = "Protoss_DragoonRush";
 							}
-
-							WorkerManager::Instance().setMineralWorker(_workerScout);
-							_workerScout = nullptr;
 						}
 
 						if (!isPylonFound && !isPylonConstructing)
