@@ -375,20 +375,7 @@ void ProductionManager::create(BWAPI::Unit producer, BuildOrderItem & item)
 				BWAPI::Unit scout = ScoutManager::Instance().getWorkerScout();
 				if (scout != nullptr) 
 				{
-					// get the enemy base location, if we have one
-					BWTA::BaseLocation * enemyBaseLocation = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->enemy());
 					position = ScoutManager::Instance().getWorkerScout()->getTilePosition();
-					if (enemyBaseLocation) {
-						BWAPI::Unitset enemyMinerals = enemyBaseLocation->getMinerals();
-						std::vector<const BWAPI::Unit> pylons;
-						if (enemyMinerals.size() > 0) {
-							for (auto& mineral : enemyMinerals) {
-								//BWAPI::Unitset unitsByMinerals = mineral->getUnitsInRadius(100);
-								position = mineral->getTilePosition();
-								break; // TODO improve: do random
-							}
-						}
-					}
 				}
 			}
 		}

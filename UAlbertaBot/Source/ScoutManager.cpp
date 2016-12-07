@@ -13,7 +13,15 @@ ScoutManager::ScoutManager()
     , _gasStealFinished(false)
     , _currentRegionVertexIndex(-1)
     , _previousScoutHP(0)
+	, _cannonRushSecondPylonDone(false)
 {
+	if (BWAPI::Broodwar->enemy())
+	{
+		if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Protoss) {
+			// no need to explore protoss since they can't rush us fast enough
+			_cannonRushEnemyBaseExplored = true;
+		}
+	}
 }
 
 ScoutManager & ScoutManager::Instance() 
@@ -119,7 +127,28 @@ void ScoutManager::moveScouts()
         _gasStealFinished = true;
     }
 
-	if (_cannonRushReady && !ProductionManager::Instance().isQueueEmpty()) {
+	if (Config::Strategy::StrategyName == "Protoss_CannonRush" && _cannonRushReady && !ProductionManager::Instance().isQueueEmpty()) {
+		_scoutStatus = "Waiting for an empty queue...";
+		
+		// move the scout around so that the build placer doesn't lock up
+		if (scoutHP < _previousScoutHP)
+		{
+			_scoutUnderAttack = true;
+			followPerimeter();
+		}
+		else // move the scout to the chokepoint
+		{
+			const std::set<BWTA::Chokepoint*>& chokepoints = enemyBaseLocation->getRegion()->getChokepoints();
+			if (chokepoints.size() > 0) {
+				BWTA::Chokepoint* chokepoint = *chokepoints.begin();
+				Micro::SmartMove(_workerScout, chokepoint->getCenter());
+			}
+			else {
+				Micro::SmartMove(_workerScout, _cannonRushChokepointPosCloser);
+			}
+		}
+
+		_previousScoutHP = scoutHP;
 		return;
 	}
     
@@ -133,6 +162,20 @@ void ScoutManager::moveScouts()
 			const std::set<BWTA::Chokepoint*>& chokepoints = enemyBaseLocation->getRegion()->getChokepoints();
 			if (chokepoints.size() > 0) {
 				BWTA::Chokepoint* chokepoint = *chokepoints.begin();
+
+				double scoutDistanceToEnemyChokepoint = _workerScout->getPosition().getDistance(chokepoint->getCenter());
+				bool scoutInRangeOfChokePoint = scoutDistanceToEnemyChokepoint > -1 && scoutDistanceToEnemyChokepoint <= 300;
+				bool scoutInRangeOfCloserChokePoint = scoutDistanceToEnemyChokepoint > -1 && scoutDistanceToEnemyChokepoint <= 250;
+
+				if (scoutInRangeOfChokePoint && _cannonRushChokepoint == BWAPI::TilePositions::Unknown) {
+					_cannonRushChokepoint = _workerScout->getTilePosition();
+					_cannonRushChokepointPos = _workerScout->getPosition();
+				}
+
+				if (scoutInRangeOfCloserChokePoint && _cannonRushChokepointCloser == BWAPI::TilePositions::Unknown) {
+					_cannonRushChokepointCloser = _workerScout->getTilePosition();
+					_cannonRushChokepointPosCloser = _workerScout->getPosition();
+				}
 
 				if (!_cannonRushEnemyBaseExplored)
 				{
@@ -194,8 +237,12 @@ void ScoutManager::moveScouts()
 				}
 				else
 				{
-					double scoutDistanceToEnemy = _workerScout->getPosition().getDistance(chokepoint->getCenter());
-					bool scoutInRangeOfenemy = scoutDistanceToEnemy > -1 && scoutDistanceToEnemy <= 25;
+					BWAPI::Position destination;
+					if (_cannonRushChokepointCloser == BWAPI::TilePositions::Unknown) destination = chokepoint->getCenter();
+					else destination = _cannonRushChokepointPosCloser;
+
+					double scoutDistanceToEnemy = _workerScout->getPosition().getDistance(destination);
+					bool scoutInRangeOfenemy = scoutDistanceToEnemy > -1 && scoutDistanceToEnemy <= 50;
 
 					if (scoutInRangeOfenemy)
 					{
@@ -204,14 +251,17 @@ void ScoutManager::moveScouts()
 						// find if a pylon is available nearby
 						// if not, build it first
 						// else, build photon cannons
-						BWAPI::Unitset nearbyUnits = _workerScout->getUnitsInRadius(500);
+						BWAPI::Unitset nearbyUnits = _workerScout->getUnitsInRadius(100);
 						bool isPylonFound = false;
 						bool isPylonConstructing = false;
-						int cannonCount = 0;
+						int pylonCount = 0;
+						int cannonCount = BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Protoss_Photon_Cannon);
 						for (auto& unit : nearbyUnits) {
 							if (unit->getType() == BWAPI::UnitTypes::Protoss_Pylon)
 							{
 								isPylonConstructing = true;
+								++pylonCount;
+
 								if (!unit->isBeingConstructed())
 								{
 									isPylonFound = true;
@@ -222,13 +272,21 @@ void ScoutManager::moveScouts()
 									}
 								}
 							}
-							else if (unit->getType() == BWAPI::UnitTypes::Protoss_Photon_Cannon)
-							{
-								++cannonCount;
-							}
+							// uncomment below for locality
+							//else if (unit->getType() == BWAPI::UnitTypes::Protoss_Photon_Cannon)
+							//{
+							//	++cannonCount;
+							//}
 						}
 
-						if (cannonCount <= 10)
+						if (cannonCount == 5 && pylonCount == 1 && _cannonRushSecondPylonDone == false) // backup pylon
+						{
+							isPylonFound = false;
+							isPylonConstructing = false;
+							_cannonRushSecondPylonDone = true;
+						}
+
+						if (cannonCount < 8)
 						{
 							_cannonRushDone = false; // we need more cannons!
 						}
@@ -245,6 +303,9 @@ void ScoutManager::moveScouts()
 							{
 								Config::Strategy::StrategyName = "Protoss_DragoonRush";
 							}
+
+							WorkerManager::Instance().setMineralWorker(_workerScout);
+							_workerScout = nullptr;
 						}
 
 						if (!isPylonFound && !isPylonConstructing)
@@ -255,7 +316,7 @@ void ScoutManager::moveScouts()
 					else
 					{
 						_scoutStatus = "Seeking the chokepoint...";
-						Micro::SmartMove(_workerScout, chokepoint->getCenter());
+						Micro::SmartMove(_workerScout, destination);
 					}
 				}
 			}
@@ -725,4 +786,12 @@ bool ScoutManager::isNextProbeScout() {
 
 void ScoutManager::setNextProbeScout(bool isScout) {
 	_nextProbeIsScout = isScout;
+}
+
+BWAPI::TilePosition ScoutManager::getChokepoint() {
+	return _cannonRushChokepoint;
+}
+
+BWAPI::TilePosition ScoutManager::getChokepointCloser() {
+	return _cannonRushChokepointCloser;
 }

@@ -203,7 +203,7 @@ const std::vector<BWAPI::TilePosition> & MapTools::getClosestTilesTo(BWAPI::Posi
 	if (Config::Strategy::StrategyName == "Protoss_CannonRush" && ScoutManager::Instance().isCannonRushReady()) {
 		BWAPI::Unit scout = ScoutManager::Instance().getWorkerScout();
 		if (scout) {
-			int a = getGroundDistance(BWAPI::Position(scout->getTilePosition()), pos);
+			int a = getGroundDistance(scout->getPosition(), pos);
 		}
 	}
 	else

@@ -20,7 +20,11 @@ class ScoutManager
 	bool							_cannonRushEnemyBaseExplored;
 	bool							_cannonRushReady;
 	bool							_cannonRushDone;
-	bool							_initialCannonRushPylonDone;
+	BWAPI::TilePosition				_cannonRushChokepoint = BWAPI::TilePositions::Unknown;
+	BWAPI::Position					_cannonRushChokepointPos;
+	BWAPI::TilePosition				_cannonRushChokepointCloser = BWAPI::TilePositions::Unknown;
+	BWAPI::Position					_cannonRushChokepointPosCloser;
+	bool							_cannonRushSecondPylonDone;
 	bool							_nextProbeIsScout;
     int                             _currentRegionVertexIndex;
     int                             _previousScoutHP;
@@ -61,5 +65,7 @@ public:
 	bool isCannonRushDone();
 	bool isNextProbeScout();
 	void setNextProbeScout(bool isScout);
+	BWAPI::TilePosition getChokepoint();
+	BWAPI::TilePosition getChokepointCloser();
 };
 }

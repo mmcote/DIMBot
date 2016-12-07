@@ -162,7 +162,7 @@ const MetaPairVector StrategyManager::getProtossBuildOrderGoal() const
             goal.push_back(MetaPair(BWAPI::UnitTypes::Protoss_Dragoon, numDragoons + 4));
         }
     }
-	else if (Config::Strategy::StrategyName == "Protoss_CannonRush") {
+	else if (Config::Strategy::StrategyName == "Protoss_CannonRush") { 
 
 	}
     else

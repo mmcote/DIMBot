@@ -422,6 +422,23 @@ BWAPI::TilePosition BuildingManager::getBuildingLocation(const Building & b)
         }
     }
 
+	if (Config::Strategy::StrategyName == "Protoss_CannonRush")
+	{
+		BWAPI::Unit scout = ScoutManager::Instance().getWorkerScout();
+		if (scout != nullptr && ScoutManager::Instance().isCannonRushReady() && !ScoutManager::Instance().isCannonRushDone() && numPylons < 2 && b.type == BWAPI::UnitTypes::Protoss_Pylon)
+		{
+			if (ScoutManager::Instance().getChokepoint() != BWAPI::TilePositions::Unknown)
+			{
+				return ScoutManager::Instance().getChokepoint(); // build pylons further away
+			}
+			else
+			{
+				BWAPI::TilePosition tp(scout->getPosition());
+				return tp;
+			}
+		}
+	}
+
     if (b.type.requiresPsi() && numPylons == 0)
     {
         return BWAPI::TilePositions::None;
