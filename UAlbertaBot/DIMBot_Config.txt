@@ -1,8 +1,8 @@
 {
     "Bot Info" :
     {
-        "BotName"                   : "UAlbertaBot",
-        "Authors"                   : "David Churchill",
+        "BotName"                   : "DIMBot",
+        "Authors"                   : "David Yee, Ian Wark, Michael Cote",
         "PrintInfoOnStart"          : false
     },
         
@@ -40,20 +40,20 @@
         "ErrorLogFilename"          : "bwapi-data/AI/UAlbertaBot_ErrorLog.txt",
         "LogAssertToErrorFile"      : false,
         
-        "DrawGameInfo"              : false,   
+        "DrawGameInfo"              : true,   
         "DrawUnitHealthBars"        : true,
         "DrawProductionInfo"        : true, 
         "DrawBuildOrderSearchInfo"  : false,
-        "DrawScoutInfo"             : false,
+        "DrawScoutInfo"             : true,
         "DrawEnemyUnitInfo"         : false,
         "DrawModuleTimers"          : false,
         "DrawResourceInfo"          : false,
         "DrawCombatSimInfo"         : false,
         "DrawUnitTargetInfo"        : false,
-        "DrawBWTAInfo"              : true,
+        "DrawBWTAInfo"              : false,
         "DrawMapGrid"               : false,
-        "DrawSquadInfo"             : true,
-        "DrawWorkerInfo"            : false,
+        "DrawSquadInfo"             : false,
+        "DrawWorkerInfo"            : true,
         "DrawMouseCursorInfo"       : false,
         "DrawBuildingInfo"          : false,
         "DrawReservedBuildingTiles" : false,
@@ -78,27 +78,27 @@
     
     "Strategy" :
     {
-        "Protoss"                   : "Protoss_DragoonRush",
+        "Protoss"                   : "Protoss_CannonRush",
         "Terran"                    : "Terran_MarineRush",
         "Zerg"                      : "Zerg_ZerglingRush",
         
         "ScoutGasSteal"             : false,
         "ScoutHarassEnemy"          : true,
-        "PreventBaiting"            : false,
+		"PreventBaiting"            : false,
         "BaitEnemy"                 : true,
+        
         "ReadDirectory"             : "bwapi-data/read/",
         "WriteDirectory"            : "bwapi-data/write/",
                 
         "UseEnemySpecificStrategy"  : true,
         "EnemySpecificStrategy"     :
         {
-            "BotName1"              : { "Protoss" : "Protoss_ZealotRush", "Terran" : "Terran_VultureRush", "Zerg" : "Zerg_ZerglingRush" },
-            "BotName2"              : { "Protoss" : "Protoss_DragoonRush", "Terran" : "Terran_MarineRush", "Zerg" : "Zerg_ZerglingRush" },
             "LetaBot"               : { "Protoss" : "Protoss_ZealotRush", "Terran" : "Terran_4RaxMarines", "Zerg" : "Zerg_ZerglingRush" }
         },
         
         "Strategies" :
         {
+            "Protoss_CannonRush"    : { "Race" : "Protoss", "OpeningBuildOrder" : ["Probe", "Probe", "Probe", "Pylon", "Probe", "Forge" ]},
             "Protoss_ZealotRush"    : { "Race" : "Protoss", "OpeningBuildOrder" : ["Probe", "Probe", "Probe", "Probe", "Pylon", "Probe", "Gateway", "Gateway", "Probe", "Probe", "Zealot", "Pylon", "Zealot", "Zealot",  "Probe", "Zealot", "Zealot", "Probe", "Pylon", "Zealot", "Gateway", "Probe", "Pylon", "Probe", "Zealot", "Probe", "Zealot", "Zealot", "Zealot", "Zealot", "Pylon", "Probe", "Zealot", "Zealot", "Zealot" ]},
             "Protoss_DragoonRush"   : { "Race" : "Protoss", "OpeningBuildOrder" : ["Probe", "Probe", "Probe", "Probe", "Pylon", "Probe", "Probe", "Gateway", "Probe", "Assimilator", "Probe", "Probe", "Cybernetics_Core", "Probe", "Probe", "Gateway", "Singularity_Charge", "Dragoon", "Gateway", "Pylon", "Dragoon", "Dragoon", "Probe", "Gateway", "Pylon", "Probe", "Dragoon", "Dragoon", "Dragoon"]},
             "Protoss_DTRush"        : { "Race" : "Protoss", "OpeningBuildOrder" : ["Probe", "Probe", "Probe", "Probe", "Pylon", "Probe", "Gateway", "Probe", "Assimilator", "Probe", "Cybernetics_Core", "Probe", "Citadel_of_Adun", "Probe", "Templar_Archives", "Gateway", "Dark_Templar", "Dark_Templar", "Pylon", "Dark_Templar", "Dark_Templar", "Probe", "Pylon", "Probe" ]},

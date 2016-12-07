@@ -1,4 +1,5 @@
 #include "MapTools.h"
+#include "ScoutManager.h"
 
 using namespace UAlbertaBot;
 
@@ -199,7 +200,16 @@ void MapTools::search(DistanceMap & dmap,const int sR,const int sC)
 const std::vector<BWAPI::TilePosition> & MapTools::getClosestTilesTo(BWAPI::Position pos)
 {
     // make sure the distance map is calculated with pos as a destination
-    int a = getGroundDistance(BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation()),pos);
+	if (Config::Strategy::StrategyName == "Protoss_CannonRush" && ScoutManager::Instance().isCannonRushReady()) {
+		BWAPI::Unit scout = ScoutManager::Instance().getWorkerScout();
+		if (scout) {
+			int a = getGroundDistance(scout->getPosition(), pos);
+		}
+	}
+	else
+	{
+		int a = getGroundDistance(BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation()), pos);
+	}
 
     return _allMaps[pos].getSortedTiles();
 }

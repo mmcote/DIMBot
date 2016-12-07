@@ -1,4 +1,5 @@
 #include "ProductionManager.h"
+#include "ScoutManager.h"
 
 using namespace UAlbertaBot;
 
@@ -22,9 +23,12 @@ void ProductionManager::setBuildOrder(const BuildOrder & buildOrder)
 
 void ProductionManager::performBuildOrderSearch()
 {	
-    if (!Config::Modules::UsingBuildOrderSearch || !canPlanBuildOrderNow())
+	if (!Config::Modules::UsingBuildOrderSearch || !canPlanBuildOrderNow() 
+		|| Config::Strategy::StrategyName == "Protoss_CannonRush") // cannon rush doesn't need a new build plan
     {
-        return;
+		// can pick a new build order if the cannon rush is done
+		if (!ScoutManager::Instance().isCannonRushDone()) 
+			return;
     }
 
 	BuildOrder & buildOrder = BOSSManager::Instance().getBuildOrder();
@@ -161,14 +165,34 @@ void ProductionManager::manageBuildOrderQueue()
         if (currentItem.metaType.isBuilding() && !(producer && canMake) && currentItem.metaType.whatBuilds().isWorker())
 		{
 			// construct a temporary building object
-			Building b(currentItem.metaType.getUnitType(), BWAPI::Broodwar->self()->getStartLocation());
-            b.isGasSteal = currentItem.isGasSteal;
+			Building b; 
 
 			// set the producer as the closest worker, but do not set its job yet
 			producer = WorkerManager::Instance().getBuilder(b, false);
 
-			// predict the worker movement to that building location
-			predictWorkerMovement(b);
+			if (Config::Strategy::StrategyName == "Protoss_CannonRush" && ScoutManager::Instance().isCannonRushReady())
+			{
+				BWAPI::Unit unit = ScoutManager::Instance().getWorkerScout();
+				if (unit != nullptr) 
+				{
+					b = Building(currentItem.metaType.getUnitType(), unit->getTilePosition());
+					producer = unit;
+					b.isGasSteal = currentItem.isGasSteal;
+					// predict the worker movement to that building location
+					predictWorkerMovement(b);
+				}
+				else 
+				{
+					producer = nullptr;
+				}
+			}
+			else
+			{
+				b = Building(currentItem.metaType.getUnitType(), BWAPI::Broodwar->self()->getStartLocation());
+				b.isGasSteal = currentItem.isGasSteal;
+				// predict the worker movement to that building location
+				predictWorkerMovement(b);
+			}
 		}
 
 		// if we can make the current item
@@ -342,7 +366,31 @@ void ProductionManager::create(BWAPI::Unit producer, BuildOrderItem & item)
         && !t.getUnitType().isAddon())
     {
         // send the building task to the building manager
-        BuildingManager::Instance().addBuildingTask(t.getUnitType(), BWAPI::Broodwar->self()->getStartLocation(), item.isGasSteal);
+		BWAPI::TilePosition position = BWAPI::Broodwar->self()->getStartLocation();
+		
+		if (Config::Strategy::StrategyName == "Protoss_CannonRush")
+		{
+			if (ScoutManager::Instance().isCannonRushReady())
+			{
+				BWAPI::Unit scout = ScoutManager::Instance().getWorkerScout();
+				if (scout != nullptr) 
+				{
+					position = ScoutManager::Instance().getWorkerScout()->getTilePosition();
+				}
+			}
+
+			if (ScoutManager::Instance().isCannonRushDone()){
+				BWAPI::Unit unit = WorkerManager::Instance().getMineralWorker();
+				if (unit != nullptr)
+				{
+					position = unit->getTilePosition();
+				}
+			}
+		}
+
+		
+
+		BuildingManager::Instance().addBuildingTask(t.getUnitType(), position, item.isGasSteal);
     }
     else if (t.getUnitType().isAddon())
     {
@@ -494,7 +542,17 @@ void ProductionManager::predictWorkerMovement(const Building & b)
 	int gasRequired						= std::max(0, b.type.gasPrice() - getFreeGas());
 
 	// get a candidate worker to move to this location
-	BWAPI::Unit moveWorker			= WorkerManager::Instance().getMoveWorker(walkToPosition);
+	BWAPI::Unit moveWorker;
+	BWAPI::Unit scout = ScoutManager::Instance().getWorkerScout();
+	if (Config::Strategy::StrategyName == "Protoss_CannonRush" && ScoutManager::Instance().isCannonRushReady() && scout != nullptr)
+	{
+		moveWorker = scout;
+	}
+	else
+	{
+		moveWorker = WorkerManager::Instance().getMoveWorker(walkToPosition);
+	}
+	
 
 	// Conditions under which to move the worker: 
 	//		- there's a valid worker to move
@@ -671,6 +729,37 @@ ProductionManager & ProductionManager::Instance()
 void ProductionManager::queueGasSteal()
 {
     _queue.queueAsHighestPriority(MetaType(BWAPI::Broodwar->self()->getRace().getRefinery()), true, true);
+}
+
+void ProductionManager::queueCannonRushPylon() {
+	if (BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Protoss) {
+		//_queue.clearAll();
+
+		_queue.queueAsHighestPriority(MetaType(BWAPI::UnitTypes::Protoss_Pylon), true);
+	}
+}
+
+void ProductionManager::queueCannonRushCannon() {
+	if (BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Protoss) {
+		_queue.queueAsLowestPriority(MetaType(BWAPI::UnitTypes::Protoss_Photon_Cannon), false);
+	}
+}
+
+void ProductionManager::queueCannonRushCannonHighPriority() {
+	if (BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Protoss) {
+		_queue.queueAsHighestPriority(MetaType(BWAPI::UnitTypes::Protoss_Photon_Cannon), true);
+	}
+}
+
+void ProductionManager::queueCannonRushNewScout() {
+	if (BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Protoss) {
+		//_queue.clearAll();
+		_queue.queueAsHighestPriority(MetaType(BWAPI::UnitTypes::Protoss_Probe), false);
+	}
+}
+
+bool ProductionManager::isQueueEmpty() {
+	return _queue.isEmpty();
 }
 
 // this will return true if any unit is on the first frame if it's training time remaining

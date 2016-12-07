@@ -73,14 +73,18 @@ void BuildingManager::assignWorkersToUnassignedBuildings()
             continue;
         }
 
-        if (_debugMode) { BWAPI::Broodwar->printf("Assigning Worker To: %s",b.type.getName().c_str()); }
+        //if (_debugMode) { BWAPI::Broodwar->printf("Assigning Worker To: %s",b.type.getName().c_str()); }
 
         // grab a worker unit from WorkerManager which is closest to this final position
         BWAPI::Unit workerToAssign = WorkerManager::Instance().getBuilder(b);
 
         if (workerToAssign)
         {
-            //BWAPI::Broodwar->printf("VALID WORKER BEING ASSIGNED: %d", workerToAssign->getID());
+			int sId = -1;
+			if (ScoutManager::Instance().getWorkerScout() != nullptr) {
+				sId = ScoutManager::Instance().getWorkerScout()->getID();
+			}
+			// BWAPI::Broodwar->printf("VALID WORKER BEING ASSIGNED: %d (scout=%d)", workerToAssign->getID(), sId);
 
             // TODO: special case of terran building whose worker died mid construction
             //       send the right click command to the buildingUnit to resume construction
@@ -100,7 +104,16 @@ void BuildingManager::assignWorkersToUnassignedBuildings()
             BuildingPlacer::Instance().reserveTiles(b.finalPosition,b.type.tileWidth(),b.type.tileHeight());
 
             b.status = BuildingStatus::Assigned;
-        }
+
+			//if (Config::Strategy::StrategyName == "Protoss_CannonRush" && workerToAssign == ScoutManager::Instance().getWorkerScout()) {
+			//	WorkerManager::Instance().setScoutWorker(workerToAssign);
+			//	BWAPI::Broodwar->printf("RESET SCOUT: %d", workerToAssign->getID());
+			//}
+		}
+		else
+		{
+			// BWAPI::Broodwar->printf("WORKER IGNORED!");
+		}
     }
 }
 
@@ -408,6 +421,23 @@ BWAPI::TilePosition BuildingManager::getBuildingLocation(const Building & b)
             return tp;
         }
     }
+
+	if (Config::Strategy::StrategyName == "Protoss_CannonRush")
+	{
+		BWAPI::Unit scout = ScoutManager::Instance().getWorkerScout();
+		if (scout != nullptr && ScoutManager::Instance().isCannonRushReady() && !ScoutManager::Instance().isCannonRushDone() && numPylons < 2 && b.type == BWAPI::UnitTypes::Protoss_Pylon)
+		{
+			if (ScoutManager::Instance().getChokepoint() != BWAPI::TilePositions::Unknown)
+			{
+				return ScoutManager::Instance().getChokepoint(); // build pylons further away
+			}
+			else
+			{
+				BWAPI::TilePosition tp(scout->getPosition());
+				return tp;
+			}
+		}
+	}
 
     if (b.type.requiresPsi() && numPylons == 0)
     {

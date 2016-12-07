@@ -15,11 +15,22 @@ class ScoutManager
 	bool			                _scoutUnderAttack;
     bool                            _didGasSteal;
     bool                            _gasStealFinished;
+	bool							_cannonRushEnemyRushPrevented;
+	bool							_cannonRushEnemyInsultHurled;
+	bool							_cannonRushEnemyBaseExplored;
+	bool							_cannonRushReady;
+	bool							_cannonRushDone;
+	BWAPI::TilePosition				_cannonRushChokepoint = BWAPI::TilePositions::Unknown;
+	BWAPI::Position					_cannonRushChokepointPos;
+	BWAPI::TilePosition				_cannonRushChokepointCloser = BWAPI::TilePositions::Unknown;
+	BWAPI::Position					_cannonRushChokepointPosCloser;
+	bool							_cannonRushSecondPylonDone;
+	bool							_nextProbeIsScout;
     int                             _currentRegionVertexIndex;
     int                             _previousScoutHP;
 	std::vector<BWAPI::Position>    _enemyRegionVertices;
 
-	bool                            enemyWorkerInRadius();
+	bool                            enemyWorkerInRadius(int radius=300);
     bool			                immediateThreat();
     void                            gasSteal();
     int                             getClosestVertexIndex(BWAPI::Unit unit);
@@ -39,6 +50,7 @@ public:
 
 	void update();
 
+	BWAPI::Unit getWorkerScout();
     void setWorkerScout(BWAPI::Unit unit);
 
 	void onSendText(std::string text);
@@ -48,5 +60,12 @@ public:
 	void onUnitRenegade(BWAPI::Unit unit);
 	void onUnitDestroy(BWAPI::Unit unit);
 	void onUnitMorph(BWAPI::Unit unit);
+
+	bool isCannonRushReady();
+	bool isCannonRushDone();
+	bool isNextProbeScout();
+	void setNextProbeScout(bool isScout);
+	BWAPI::TilePosition getChokepoint();
+	BWAPI::TilePosition getChokepointCloser();
 };
 }
