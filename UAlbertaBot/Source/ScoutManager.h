@@ -24,6 +24,8 @@ class ScoutManager
 	BWAPI::Position					_cannonRushChokepointPos;
 	BWAPI::TilePosition				_cannonRushChokepointCloser = BWAPI::TilePositions::Unknown;
 	BWAPI::Position					_cannonRushChokepointPosCloser;
+	BWAPI::TilePosition				_cannonRushChokepointClosest = BWAPI::TilePositions::Unknown;
+	BWAPI::Position					_cannonRushChokepointPosClosest;
 	bool							_cannonRushSecondPylonDone;
 	bool							_nextProbeIsScout;
     int                             _currentRegionVertexIndex;

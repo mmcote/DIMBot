@@ -97,6 +97,26 @@ void ScoutManager::moveScouts()
 		return;
 	}
 
+	// only return the scout back to the mineral worker when we are close
+	// fixes an explot by UAlbertaBot whereby this worker becomes the combat worker but is too far away to fight the bot
+	if (_cannonRushDone) 
+	{
+		_scoutStatus = "Returning home...";
+		BWAPI::Position home = InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->self())->getRegion()->getCenter();
+		Micro::SmartMove(_workerScout, home);
+
+		double scoutDistanceToHome = _workerScout->getPosition().getDistance(home);
+		bool scoutInRangeOfHome = scoutDistanceToHome > -1 && scoutDistanceToHome <= 600;
+		if (scoutInRangeOfHome)
+		{
+			WorkerManager::Instance().setMineralWorker(_workerScout);
+			_workerScout = nullptr;
+			_scoutStatus = "None";
+		}
+
+		return;
+	}
+
 	if (_cannonRushReady && WorkerManager::Instance().isBuilder(_workerScout)) {
 		return;
 	}
@@ -138,13 +158,21 @@ void ScoutManager::moveScouts()
 		}
 		else // move the scout to the chokepoint
 		{
-			const std::set<BWTA::Chokepoint*>& chokepoints = enemyBaseLocation->getRegion()->getChokepoints();
-			if (chokepoints.size() > 0) {
-				BWTA::Chokepoint* chokepoint = *chokepoints.begin();
-				Micro::SmartMove(_workerScout, chokepoint->getCenter());
+			if (_cannonRushChokepointClosest != BWAPI::TilePositions::Unknown)
+			{
+				Micro::SmartMove(_workerScout, _cannonRushChokepointPosClosest);
 			}
-			else {
+			else if (_cannonRushChokepointCloser != BWAPI::TilePositions::Unknown)
+			{
 				Micro::SmartMove(_workerScout, _cannonRushChokepointPosCloser);
+			}
+			else
+			{ // fallback to the chokepoint itself
+				const std::set<BWTA::Chokepoint*>& chokepoints = enemyBaseLocation->getRegion()->getChokepoints();
+				if (chokepoints.size() > 0) {
+					BWTA::Chokepoint* chokepoint = *chokepoints.begin();
+					Micro::SmartMove(_workerScout, chokepoint->getCenter());
+				}
 			}
 		}
 
@@ -164,8 +192,12 @@ void ScoutManager::moveScouts()
 				BWTA::Chokepoint* chokepoint = *chokepoints.begin();
 
 				double scoutDistanceToEnemyChokepoint = _workerScout->getPosition().getDistance(chokepoint->getCenter());
+				// track furthest (pylons here)
 				bool scoutInRangeOfChokePoint = scoutDistanceToEnemyChokepoint > -1 && scoutDistanceToEnemyChokepoint <= 600;
+				// track second closest (photon cannons here)
 				bool scoutInRangeOfCloserChokePoint = scoutDistanceToEnemyChokepoint > -1 && scoutDistanceToEnemyChokepoint <= 550;
+				// track closest (scout resides here)
+				bool scoutInRangeOfClosestChokePoint = scoutDistanceToEnemyChokepoint > -1 && scoutDistanceToEnemyChokepoint <= 300;
 				bool scoutOutOfRange = scoutDistanceToEnemyChokepoint > -1 && scoutDistanceToEnemyChokepoint > 600;
 
 				if (!_cannonRushReady && scoutOutOfRange) // check for a worker rush before cannon rush is ready
@@ -186,13 +218,9 @@ void ScoutManager::moveScouts()
 
 							_cannonRushDone = true;
 
-							Micro::SmartMove(_workerScout, InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->self())->getRegion()->getCenter());
-
 							ProductionManager::Instance().queueCannonRushCannonHighPriority();
 							ProductionManager::Instance().queueCannonRushPylon();
 
-							WorkerManager::Instance().setMineralWorker(_workerScout);
-							_workerScout = nullptr;
 							Config::Strategy::StrategyName = "Protoss_DTRush";
 
 							return;
@@ -205,17 +233,22 @@ void ScoutManager::moveScouts()
 
 						_cannonRushDone = true;
 
-						Micro::SmartMove(_workerScout, InformationManager::Instance().getMainBaseLocation(BWAPI::Broodwar->self())->getRegion()->getCenter());
-
 						ProductionManager::Instance().queueCannonRushCannonHighPriority();
 						ProductionManager::Instance().queueCannonRushCannonHighPriority();
 						ProductionManager::Instance().queueCannonRushPylon();
 
-						WorkerManager::Instance().setMineralWorker(_workerScout);
-						_workerScout = nullptr;
 						Config::Strategy::StrategyName = "Protoss_DTRush";
 
 						return;
+					}
+				}
+
+				if (scoutInRangeOfClosestChokePoint && _cannonRushChokepointClosest == BWAPI::TilePositions::Unknown) {
+					bool canBuild = BWAPI::Broodwar->canBuildHere(_workerScout->getTilePosition(), BWAPI::UnitTypes::Protoss_Pylon, _workerScout);
+					if (canBuild)
+					{
+						_cannonRushChokepointClosest = _workerScout->getTilePosition();
+						_cannonRushChokepointPosClosest = _workerScout->getPosition();
 					}
 				}
 				
@@ -270,9 +303,6 @@ void ScoutManager::moveScouts()
 								ProductionManager::Instance().queueCannonRushCannonHighPriority();
 								ProductionManager::Instance().queueCannonRushPylon();
 
-								WorkerManager::Instance().setMineralWorker(_workerScout);
-								_workerScout = nullptr;
-
 								if (unit->getType() == BWAPI::UnitTypes::Terran_Marine || unit->getType() == BWAPI::UnitTypes::Zerg_Spawning_Pool)
 								{
 									// We don't have a whole lot of time for a better strategy...
@@ -300,8 +330,8 @@ void ScoutManager::moveScouts()
 				else
 				{
 					BWAPI::Position destination;
-					if (_cannonRushChokepointCloser == BWAPI::TilePositions::Unknown) destination = chokepoint->getCenter();
-					else destination = _cannonRushChokepointPosCloser;
+					if (_cannonRushChokepointClosest == BWAPI::TilePositions::Unknown) destination = chokepoint->getCenter();
+					else destination = _cannonRushChokepointPosClosest;
 
 					double scoutDistanceToEnemy = _workerScout->getPosition().getDistance(destination);
 					bool scoutInRangeOfenemy = scoutDistanceToEnemy > -1 && scoutDistanceToEnemy <= 50;
@@ -359,10 +389,6 @@ void ScoutManager::moveScouts()
 							ProductionManager::Instance().queueCannonRushPylon();
 							ProductionManager::Instance().queueCannonRushCannonHighPriority();
 							ProductionManager::Instance().queueCannonRushCannonHighPriority();
-
-							WorkerManager::Instance().setMineralWorker(_workerScout);
-							_scoutStatus = "None";
-							_workerScout = nullptr;
 
 							// pick a decent strategy against cloaked units
 							if (InformationManager::Instance().enemyHasCloakedUnits())
