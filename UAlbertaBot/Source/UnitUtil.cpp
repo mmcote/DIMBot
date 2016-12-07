@@ -103,6 +103,23 @@ double UnitUtil::CalculateLTD(BWAPI::Unit attacker, BWAPI::Unit target)
     return static_cast<double>(weapon.damageAmount()) / weapon.damageCooldown();
 }
 
+double UnitUtil::CalculateThreatVSHealthRatio(BWAPI::Unit enemy)
+{
+	if (!enemy->exists()) { return -1;  }
+	if (enemy->getHitPoints() == 0) { return 0; }
+	// if it's a higher priority, or it's closer, or is close and has a better attack/hitpoint ratio, set it
+	double ratio;
+	if (enemy->canAttack(false) && enemy->getType() != BWAPI::WeaponTypes::None) {
+		BWAPI::WeaponType weapon = enemy->getType().groundWeapon();
+		if (weapon.damageCooldown() == 0) { return 50 / enemy->getHitPoints() + enemy->getShields(); }
+		ratio = (weapon.damageAmount() * weapon.damageFactor()) / weapon.damageCooldown();  // calculate damage potential
+		ratio = ratio / enemy->getHitPoints() + enemy->getShields();					    // divide by hit points and shields remaining. armor factors in?
+	}
+	else { ratio = 50 / enemy->getHitPoints() + enemy->getShields(); }
+
+	return ratio;
+}
+
 BWAPI::WeaponType UnitUtil::GetWeapon(BWAPI::Unit attacker, BWAPI::Unit target)
 {
     return target->isFlying() ? attacker->getType().airWeapon() : attacker->getType().groundWeapon();

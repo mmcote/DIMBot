@@ -1,5 +1,6 @@
 #include "MeleeManager.h"
 #include "UnitUtil.h"
+#include "SquadOrder.h"
 
 using namespace UAlbertaBot;
 
@@ -36,10 +37,12 @@ void MeleeManager::assignTargetsOld(const BWAPI::Unitset & targets)
 	for (auto & meleeUnit : meleeUnits)
 	{
 		// if the order is to attack or defend
-		if (order.getType() == SquadOrderTypes::Attack || order.getType() == SquadOrderTypes::Defend) 
+		if (order.getType() == SquadOrderTypes::Attack || order.getType() == SquadOrderTypes::Defend 
+			|| order.getType() == SquadOrderTypes::DropAttack) 
         {
             // run away if we meet the retreat critereon
-            if (meleeUnitShouldRetreat(meleeUnit, targets))
+			// never run if DropAttack squad
+			if (order.getType() != SquadOrderTypes::DropAttack && meleeUnitShouldRetreat(meleeUnit, targets))
             {
                 BWAPI::Position fleeTo(BWAPI::Broodwar->self()->getStartLocation());
 
@@ -50,7 +53,6 @@ void MeleeManager::assignTargetsOld(const BWAPI::Unitset & targets)
 			{
 				// find the best target for this meleeUnit
 				BWAPI::Unit target = getTarget(meleeUnit, meleeUnitTargets);
-
 				// attack it
 				Micro::SmartAttackUnit(meleeUnit, target);
 			}
@@ -100,6 +102,7 @@ BWAPI::Unit MeleeManager::getTarget(BWAPI::Unit meleeUnit, const BWAPI::Unitset 
 {
 	int highPriority = 0;
 	double closestDist = std::numeric_limits<double>::infinity();
+	double bestRatio = 0;
 	BWAPI::Unit closestTarget = nullptr;
 
 	// for each target possiblity
@@ -108,11 +111,16 @@ BWAPI::Unit MeleeManager::getTarget(BWAPI::Unit meleeUnit, const BWAPI::Unitset 
 		int priority = getAttackPriority(meleeUnit, unit);
 		int distance = meleeUnit->getDistance(unit);
 
-		// if it's a higher priority, or it's closer, set it
-		if (!closestTarget || (priority > highPriority) || (priority == highPriority && distance < closestDist))
+		double ratio = UnitUtil::CalculateThreatVSHealthRatio(unit);
+		// if it's a higher priority, or it's closer, or attacker is dropAttack and enemy is close and has a better attack/hitpoint ratio, set it
+		if (!closestTarget || (priority > highPriority) 
+			|| (priority == highPriority && distance <= closestDist)
+			|| (order.getType() == SquadOrderTypes::DropAttack && unit->getType().isWorker()
+			&& priority == highPriority && distance <= closestDist + 200 && ratio > bestRatio))
 		{
 			closestDist = distance;
 			highPriority = priority;
+			bestRatio = ratio;
 			closestTarget = unit;
 		}
 	}
@@ -125,7 +133,12 @@ int MeleeManager::getAttackPriority(BWAPI::Unit attacker, BWAPI::Unit unit)
 {
 	BWAPI::UnitType type = unit->getType();
 
-    if (attacker->getType() == BWAPI::UnitTypes::Protoss_Dark_Templar 
+	// If DropAttack squad, target workers first, then use default priority
+	if (order.getType() == SquadOrderTypes::DropAttack && type.isWorker())
+	{
+		return 20;
+	}
+    else if (attacker->getType() == BWAPI::UnitTypes::Protoss_Dark_Templar 
         && unit->getType() == BWAPI::UnitTypes::Terran_Missile_Turret
         && (BWAPI::Broodwar->self()->deadUnitCount(BWAPI::UnitTypes::Protoss_Dark_Templar) == 0))
     {

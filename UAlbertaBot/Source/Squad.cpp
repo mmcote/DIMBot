@@ -458,3 +458,8 @@ const std::string & Squad::getName() const
 {
     return _name;
 }
+
+const BWAPI::Unit Squad::getTransportShip() const
+{
+	return _transportManager.getTransportShip();
+}

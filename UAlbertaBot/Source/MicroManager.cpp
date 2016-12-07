@@ -33,7 +33,8 @@ BWAPI::Position MicroManager::calcCenter() const
 void MicroManager::execute(const SquadOrder & inputOrder)
 {
 	// Nothing to do if we have no units
-	if (_units.empty() || !(inputOrder.getType() == SquadOrderTypes::Attack || inputOrder.getType() == SquadOrderTypes::Defend))
+	if (_units.empty() || !(inputOrder.getType() == SquadOrderTypes::Attack || 
+		inputOrder.getType() == SquadOrderTypes::Defend || inputOrder.getType() == SquadOrderTypes::DropAttack))
 	{
 		return;
 	}
@@ -50,7 +51,7 @@ void MicroManager::execute(const SquadOrder & inputOrder)
 		MapGrid::Instance().GetUnits(nearbyEnemies, order.getPosition(), order.getRadius(), false, true);
 	
 	} // otherwise we want to see everything on the way
-	else if (order.getType() == SquadOrderTypes::Attack) 
+	else if (order.getType() == SquadOrderTypes::Attack || order.getType() == SquadOrderTypes::DropAttack)
 	{
 		MapGrid::Instance().GetUnits(nearbyEnemies, order.getPosition(), order.getRadius(), false, true);
 		for (auto & unit : _units) 
@@ -59,11 +60,11 @@ void MicroManager::execute(const SquadOrder & inputOrder)
 			BWAPI::UnitType t = u->getType();
 			MapGrid::Instance().GetUnits(nearbyEnemies, unit->getPosition(), order.getRadius(), false, true);
 		}
-	}
+	} 
 
 	// the following block of code attacks all units on the way to the order position
 	// we want to do this if the order is attack, defend, or harass
-	if (order.getType() == SquadOrderTypes::Attack || order.getType() == SquadOrderTypes::Defend) 
+	if (order.getType() == SquadOrderTypes::Attack || order.getType() == SquadOrderTypes::Defend || order.getType() == SquadOrderTypes::DropAttack)
 	{
         // if this is a worker defense force
         if (_units.size() == 1 && (*_units.begin())->getType().isWorker())
@@ -73,9 +74,9 @@ void MicroManager::execute(const SquadOrder & inputOrder)
         // otherwise it is a normal attack force
         else
         {
-            // if this is a defense squad then we care about all units in the area
-            if (order.getType() == SquadOrderTypes::Defend)
-            {
+            // if this is a defense squad or dropAttack squad then we care about all units in the area
+			if (order.getType() == SquadOrderTypes::Defend || order.getType() == SquadOrderTypes::DropAttack)
+			{
                 executeMicro(nearbyEnemies);
             }
             // otherwise we only care about workers if they are in their own region

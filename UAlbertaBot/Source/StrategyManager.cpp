@@ -125,6 +125,7 @@ const MetaPairVector StrategyManager::getProtossBuildOrderGoal() const
     int numScout            = UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Protoss_Corsair);
     int numReaver           = UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Protoss_Reaver);
     int numDarkTeplar       = UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Protoss_Dark_Templar);
+	int numShuttles		    = UnitUtil::GetAllUnitCount(BWAPI::UnitTypes::Protoss_Shuttle);
 
     if (Config::Strategy::StrategyName == "Protoss_ZealotRush")
     {
@@ -142,16 +143,24 @@ const MetaPairVector StrategyManager::getProtossBuildOrderGoal() const
     }
     else if (Config::Strategy::StrategyName == "Protoss_Drop")
     {
-        if (numZealots == 0)
-        {
-            goal.push_back(MetaPair(BWAPI::UnitTypes::Protoss_Zealot, numZealots + 4));
-            goal.push_back(MetaPair(BWAPI::UnitTypes::Protoss_Shuttle, 1));
-        }
-        else
-        {
-            goal.push_back(MetaPair(BWAPI::UnitTypes::Protoss_Zealot, numZealots + 8));
-        }
+		if (numShuttles == 0)
+		{
+			goal.push_back(MetaPair(BWAPI::UnitTypes::Protoss_Shuttle, 1));
+		}
+		goal.push_back(MetaPair(BWAPI::UnitTypes::Protoss_Dragoon, numDragoons + 4));
+		goal.push_back(MetaPair(BWAPI::UnitTypes::Protoss_Zealot, numZealots + 8));
+
     }
+	else if (Config::Strategy::StrategyName == "Protoss_DTDrop")
+	{
+		if (numShuttles == 0)
+		{
+			goal.push_back(MetaPair(BWAPI::UnitTypes::Protoss_Shuttle, 1));
+		}
+		goal.push_back(MetaPair(BWAPI::UnitTypes::Protoss_Zealot, numZealots + 8));
+		goal.push_back(MetaPair(BWAPI::UnitTypes::Protoss_Dark_Templar, numDarkTeplar + 4));
+		goal.push_back(MetaPair(BWAPI::UnitTypes::Protoss_Dragoon, numDragoons + 4));
+	}
     else if (Config::Strategy::StrategyName == "Protoss_DTRush")
     {
         goal.push_back(MetaPair(BWAPI::UnitTypes::Protoss_Dark_Templar, numDarkTeplar + 2));

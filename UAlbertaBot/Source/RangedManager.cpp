@@ -27,7 +27,7 @@ void RangedManager::assignTargetsOld(const BWAPI::Unitset & targets)
 		//trainSubUnits(rangedUnit);
 
 		// if the order is to attack or defend
-		if (order.getType() == SquadOrderTypes::Attack || order.getType() == SquadOrderTypes::Defend) 
+		if (order.getType() == SquadOrderTypes::Attack || order.getType() == SquadOrderTypes::Defend || order.getType() == SquadOrderTypes::DropAttack)
         {
 			// if there are targets
 			if (!rangedUnitTargets.empty())
@@ -39,7 +39,6 @@ void RangedManager::assignTargetsOld(const BWAPI::Unitset & targets)
 	            {
 		            BWAPI::Broodwar->drawLineMap(rangedUnit->getPosition(), rangedUnit->getTargetPosition(), BWAPI::Colors::Purple);
 	            }
-
 
 				// attack it
                 if (Config::Micro::KiteWithRangedUnits)
@@ -98,8 +97,11 @@ BWAPI::Unit RangedManager::getTarget(BWAPI::Unit rangedUnit, const BWAPI::Unitse
 {
 	int bestPriorityDistance = 1000000;
     int bestPriority = 0;
+
+	bool bestCloseToShooter = false;
     
     double bestLTD = 0;
+	double bestRatio = 0;
 
     int highPriority = 0;
 	double closestDist = std::numeric_limits<double>::infinity();
@@ -111,11 +113,17 @@ BWAPI::Unit RangedManager::getTarget(BWAPI::Unit rangedUnit, const BWAPI::Unitse
         double LTD              = UnitUtil::CalculateLTD(target, rangedUnit);
         int priority            = getAttackPriority(rangedUnit, target);
         bool targetIsThreat     = LTD > 0;
-        
-		if (!closestTarget || (priority > highPriority) || (priority == highPriority && distance < closestDist))
+		double ratio			= UnitUtil::CalculateThreatVSHealthRatio(target);					    // Target enemy with largest damage/health ratio
+		bool closeToShooter		= (UnitUtil::GetWeapon(rangedUnit, target).maxRange() * .5) > distance;  // target is considered closeToShooter if within 1/3 the range of the unit
+
+		if (!closestTarget || (priority > highPriority) 
+			|| (priority == highPriority && !bestCloseToShooter && distance < closestDist)		    	// If targets are out of range or not close, get closest
+			|| (priority == highPriority && closeToShooter && ratio > bestRatio))					    // If current target is in range and close, get one with largest damage/hp ratio
 		{
 			closestDist = distance;
 			highPriority = priority;
+			bestCloseToShooter = closeToShooter;
+			bestRatio = ratio;
 			closestTarget = target;
 		}       
     }
@@ -129,8 +137,13 @@ int RangedManager::getAttackPriority(BWAPI::Unit rangedUnit, BWAPI::Unit target)
 	BWAPI::UnitType rangedType = rangedUnit->getType();
 	BWAPI::UnitType targetType = target->getType();
 
-    
-    if (rangedUnit->getType() == BWAPI::UnitTypes::Zerg_Scourge)
+	// If DropAttack squad, target workers first, then use default priority
+	if (order.getType() == SquadOrderTypes::DropAttack && target->getType().isWorker())
+	{
+		return 20;
+	}
+	
+	if (rangedUnit->getType() == BWAPI::UnitTypes::Zerg_Scourge)
     {
         if (target->getType() == BWAPI::UnitTypes::Protoss_Carrier)
         {
