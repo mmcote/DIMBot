@@ -109,6 +109,9 @@ void ScoutManager::moveScouts()
 		bool scoutInRangeOfHome = scoutDistanceToHome > -1 && scoutDistanceToHome <= 600;
 		if (scoutInRangeOfHome)
 		{
+			BuildingPlacer::Instance().freeTiles(_cannonRushChokepoint, 2, 2);
+			BuildingPlacer::Instance().freeTiles(_cannonRushChokepointCloser, 2, 2);
+			BuildingPlacer::Instance().freeTiles(_cannonRushChokepointClosest, 2, 2);
 			WorkerManager::Instance().setMineralWorker(_workerScout);
 			_workerScout = nullptr;
 			_scoutStatus = "None";
@@ -158,13 +161,36 @@ void ScoutManager::moveScouts()
 		}
 		else // move the scout to the chokepoint
 		{
+			// the following conditions keep the bot moving so that it doesn't remain in the same location nor get stuck
 			if (_cannonRushChokepointClosest != BWAPI::TilePositions::Unknown)
 			{
-				Micro::SmartMove(_workerScout, _cannonRushChokepointPosClosest);
+				double scoutDistanceToChokepoint = _workerScout->getPosition().getDistance(_cannonRushChokepointPosClosest);
+				if (scoutDistanceToChokepoint > 100)
+				{ 
+					Micro::SmartMove(_workerScout, _cannonRushChokepointPosClosest);
+				}
+				else
+				{
+					Micro::SmartMove(_workerScout, _cannonRushChokepointPosCloser);
+				}
 			}
 			else if (_cannonRushChokepointCloser != BWAPI::TilePositions::Unknown)
 			{
 				Micro::SmartMove(_workerScout, _cannonRushChokepointPosCloser);
+				double scoutDistanceToChokepoint = _workerScout->getPosition().getDistance(_cannonRushChokepointPosCloser);
+
+				if (scoutDistanceToChokepoint > 100)
+				{
+					Micro::SmartMove(_workerScout, _cannonRushChokepointPosCloser);
+				}
+				else
+				{
+					const std::set<BWTA::Chokepoint*>& chokepoints = enemyBaseLocation->getRegion()->getChokepoints();
+					if (chokepoints.size() > 0) {
+						BWTA::Chokepoint* chokepoint = *chokepoints.begin();
+						Micro::SmartMove(_workerScout, chokepoint->getCenter());
+					}
+				}
 			}
 			else
 			{ // fallback to the chokepoint itself
@@ -204,6 +230,7 @@ void ScoutManager::moveScouts()
 				{
 					BWAPI::Unitset nearbyUnits = _workerScout->getUnitsInRadius(100);
 					int workerCount = 0;
+					int nonWorkerCount = 0;
 					for (auto& unit : nearbyUnits) {
 						if (unit->getType().isWorker())
 						{
@@ -225,6 +252,11 @@ void ScoutManager::moveScouts()
 
 							return;
 						}
+						else if (!unit->getType().isWorker())
+						{
+							if (BWAPI::Broodwar->enemy()->getUnits().contains(unit))
+								++nonWorkerCount;
+						}
 					}
 
 					if (workerCount >= 3)
@@ -241,6 +273,18 @@ void ScoutManager::moveScouts()
 
 						return;
 					}
+
+					if (nonWorkerCount > 0) // we are too late! go back home and abort!
+					{
+						_cannonRushDone = true;
+
+						ProductionManager::Instance().queueCannonRushCannonHighPriority();
+						ProductionManager::Instance().queueCannonRushCannonHighPriority();
+						ProductionManager::Instance().queueCannonRushPylon();
+
+						Config::Strategy::StrategyName = "Protoss_DTRush";
+						return;
+					}
 				}
 
 				if (scoutInRangeOfClosestChokePoint && _cannonRushChokepointClosest == BWAPI::TilePositions::Unknown) {
@@ -249,6 +293,7 @@ void ScoutManager::moveScouts()
 					{
 						_cannonRushChokepointClosest = _workerScout->getTilePosition();
 						_cannonRushChokepointPosClosest = _workerScout->getPosition();
+						BuildingPlacer::Instance().reserveTiles(_cannonRushChokepointClosest, 2, 2);
 					}
 				}
 				
@@ -258,6 +303,7 @@ void ScoutManager::moveScouts()
 					{
 						_cannonRushChokepoint = _workerScout->getTilePosition();
 						_cannonRushChokepointPos = _workerScout->getPosition();
+						BuildingPlacer::Instance().reserveTiles(_cannonRushChokepoint, 2, 2);
 					}
 				}
 
@@ -267,6 +313,7 @@ void ScoutManager::moveScouts()
 					{
 						_cannonRushChokepointCloser = _workerScout->getTilePosition();
 						_cannonRushChokepointPosCloser = _workerScout->getPosition();
+						BuildingPlacer::Instance().reserveTiles(_cannonRushChokepointCloser, 2, 2);
 					}
 				}
 
@@ -343,7 +390,7 @@ void ScoutManager::moveScouts()
 						// find if a pylon is available nearby
 						// if not, build it first
 						// else, build photon cannons
-						BWAPI::Unitset nearbyUnits = _workerScout->getUnitsInRadius(100);
+						BWAPI::Unitset nearbyUnits = _workerScout->getUnitsInRadius(250);
 						bool isPylonFound = false;
 						bool isPylonConstructing = false;
 						int pylonCount = 0;
@@ -390,15 +437,7 @@ void ScoutManager::moveScouts()
 							ProductionManager::Instance().queueCannonRushCannonHighPriority();
 							ProductionManager::Instance().queueCannonRushCannonHighPriority();
 
-							// pick a decent strategy against cloaked units
-							if (InformationManager::Instance().enemyHasCloakedUnits())
-							{
-								Config::Strategy::StrategyName = "Protoss_DTRush";
-							}
-							else
-							{
-								Config::Strategy::StrategyName = "Protoss_DragoonRush";
-							}
+							Config::Strategy::StrategyName = "Protoss_DTRush";
 						}
 
 						if (!isPylonFound && !isPylonConstructing)
