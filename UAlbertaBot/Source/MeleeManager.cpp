@@ -29,7 +29,8 @@ void MeleeManager::assignTargetsOld(const BWAPI::Unitset & targets)
 			!(target->getType() == BWAPI::UnitTypes::Zerg_Larva) && 
 			!(target->getType() == BWAPI::UnitTypes::Zerg_Egg) &&
 			target->isVisible() && 
-			(squadData.getBaitUnit() != NULL && target != squadData.getBaitUnit())) 
+			(!Config::Strategy::PreventBaiting 
+			|| (squadData.getBaitUnit() != NULL && target != squadData.getBaitUnit()))) 
 		{
 			meleeUnitTargets.insert(target);
 		}
